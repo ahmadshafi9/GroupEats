@@ -19,7 +19,7 @@ import { db, storage } from '../../firebaseConfig';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyDqNDyio63FqckAyHsaCDOoidc6Mj3CgMU'; // Replace this!
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 type SelectedPlace = {
   placeId: string;
