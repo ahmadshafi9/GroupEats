@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   TextInput, 
-  StyleSheet, 
   Image, 
   ScrollView,
   Alert,
@@ -13,22 +12,14 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import { collection, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebaseConfig';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
-
-const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
-type SelectedPlace = {
-  placeId: string;
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-  types: string[];
-};
+import { PostService } from '../../services/posts/postService';
+import { ImageUploadService } from '../../services/storage/imageUploadService';
+import { GooglePlacesService } from '../../services/places/googlePlacesService';
+import { Validation } from '../../utils/validation';
+import { SelectedPlace } from '../../types/Place';
+import { newPostStyles } from '../../styles/newPost.styles';
 
 export default function NewPost() {
   const { user, userProfile } = useAuth();
@@ -105,27 +96,6 @@ export default function NewPost() {
     }
   };
 
-  // Upload image to Firebase Storage
-  const uploadImage = async (uri: string): Promise<string> => {
-    try {
-      if (!user?.uid) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      const filename = `posts/${user.uid}/${Date.now()}.jpg`;
-      const storageRef = ref(storage, filename);
-
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
 
   // Submit post
   const handleSubmit = async () => {
@@ -138,8 +108,13 @@ export default function NewPost() {
       Alert.alert('Error', 'Please add a photo');
       return;
     }
-    if (!description.trim()) {
+    if (!Validation.isRequired(description)) {
       Alert.alert('Error', 'Please write a review');
+      return;
+    }
+
+    if (!user?.uid) {
+      Alert.alert('Error', 'You must be logged in to post');
       return;
     }
 
@@ -147,11 +122,11 @@ export default function NewPost() {
 
     try {
       // Upload image
-      const photoUrl = await uploadImage(imageUri);
+      const photoUrl = await ImageUploadService.uploadPostImage(imageUri, user.uid);
 
       // Create post in Firestore
-      await addDoc(collection(db, 'posts'), {
-        userId: user?.uid,
+      await PostService.createPost({
+        userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
         userProfilePic: userProfile?.profilePic || '',
         
@@ -169,9 +144,6 @@ export default function NewPost() {
           latitude: selectedPlace.lat,
           longitude: selectedPlace.lng,
         },
-        
-        createdAt: new Date().toISOString(),
-        likes: [],
       });
 
       Alert.alert('Success', 'Review posted!', [
@@ -186,20 +158,20 @@ export default function NewPost() {
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container}
+      style={newPostStyles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="always">
-        <Text style={styles.title}>Review a Place</Text>
+      <ScrollView style={newPostStyles.scrollView} keyboardShouldPersistTaps="always">
+        <Text style={newPostStyles.title}>Review a Place</Text>
 
         {/* Google Places Search */}
-        <View style={styles.searchSection}>
-          <Text style={styles.label}>🔍 Search for a place:</Text>
+        <View style={newPostStyles.searchSection}>
+          <Text style={newPostStyles.label}>🔍 Search for a place:</Text>
           
           {/* Text input with dropdown suggestions */}
           <View>
             <TextInput
-              style={styles.searchInput}
+              style={newPostStyles.searchInput}
               placeholder="Enter place name (e.g., Starbucks)"
               placeholderTextColor="#999"
               value={placeName}
@@ -212,11 +184,11 @@ export default function NewPost() {
             
             {/* Dropdown suggestions */}
             {showSuggestions && filteredSuggestions.length > 0 && (
-              <View style={styles.suggestionsContainer}>
+              <View style={newPostStyles.suggestionsContainer}>
                 {filteredSuggestions.map((place, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.suggestionItem}
+                    style={newPostStyles.suggestionItem}
                     onPress={() => {
                       setSelectedPlace({
                         placeId: place.name.toLowerCase().replace(/\s+/g, '-'),
@@ -230,8 +202,8 @@ export default function NewPost() {
                       setShowSuggestions(false);
                     }}
                   >
-                    <Text style={styles.suggestionName}>{place.name}</Text>
-                    <Text style={styles.suggestionAddress}>{place.address}</Text>
+                    <Text style={newPostStyles.suggestionName}>{place.name}</Text>
+                    <Text style={newPostStyles.suggestionAddress}>{place.address}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -254,14 +226,10 @@ export default function NewPost() {
                 setShowSuggestions(false);
               }
             }}
-            query={{
-              key: GOOGLE_PLACES_API_KEY,
-              language: 'en',
-              types: 'establishment',
-            }}
+            query={GooglePlacesService.getPlacesAutocompleteConfig()}
             styles={{
               container: { flex: 0 },
-              textInput: styles.searchInput,
+              textInput: newPostStyles.searchInput,
               listView: {
                 position: 'absolute',
                 top: 50,
@@ -277,47 +245,47 @@ export default function NewPost() {
 
         {/* Selected Place Display */}
         {selectedPlace && (
-          <View style={styles.selectedPlace}>
-            <Text style={styles.selectedPlaceName}>✅ {selectedPlace.name}</Text>
-            <Text style={styles.selectedPlaceAddress}>{selectedPlace.address}</Text>
+          <View style={newPostStyles.selectedPlace}>
+            <Text style={newPostStyles.selectedPlaceName}>✅ {selectedPlace.name}</Text>
+            <Text style={newPostStyles.selectedPlaceAddress}>{selectedPlace.address}</Text>
           </View>
         )}
 
         {/* Image picker */}
-        <View style={styles.imageSection}>
-          <Text style={styles.label}>📸 Add a photo:</Text>
+        <View style={newPostStyles.imageSection}>
+          <Text style={newPostStyles.label}>📸 Add a photo:</Text>
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.image} />
+            <Image source={{ uri: imageUri }} style={newPostStyles.image} />
           ) : (
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.placeholderText}>No photo selected</Text>
+            <View style={newPostStyles.imagePlaceholder}>
+              <Text style={newPostStyles.placeholderText}>No photo selected</Text>
             </View>
           )}
           
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-              <Text style={styles.buttonText}>📷 Gallery</Text>
+          <View style={newPostStyles.buttonRow}>
+            <TouchableOpacity style={newPostStyles.imageButton} onPress={pickImage}>
+              <Text style={newPostStyles.buttonText}>📷 Gallery</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
-              <Text style={styles.buttonText}>📸 Camera</Text>
+            <TouchableOpacity style={newPostStyles.imageButton} onPress={takePhoto}>
+              <Text style={newPostStyles.buttonText}>📸 Camera</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Rating */}
-        <View style={styles.ratingSection}>
-          <Text style={styles.label}>⭐ Your rating:</Text>
-          <View style={styles.ratingButtons}>
+        <View style={newPostStyles.ratingSection}>
+          <Text style={newPostStyles.label}>⭐ Your rating:</Text>
+          <View style={newPostStyles.ratingButtons}>
             {[1, 2, 3, 4, 5].map((num) => (
               <TouchableOpacity
                 key={num}
                 style={[
-                  styles.ratingButton,
-                  rating === num.toString() && styles.ratingButtonActive
+                  newPostStyles.ratingButton,
+                  rating === num.toString() && newPostStyles.ratingButtonActive
                 ]}
                 onPress={() => setRating(num.toString())}
               >
-                <Text style={styles.ratingButtonText}>
+                <Text style={newPostStyles.ratingButtonText}>
                   {num} ⭐
                 </Text>
               </TouchableOpacity>
@@ -326,10 +294,10 @@ export default function NewPost() {
         </View>
 
         {/* Description */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.label}>✍️ Your review:</Text>
+        <View style={newPostStyles.descriptionSection}>
+          <Text style={newPostStyles.label}>✍️ Your review:</Text>
           <TextInput
-            style={styles.textArea}
+            style={newPostStyles.textArea}
             placeholder="What did you think? Share your experience..."
             value={description}
             onChangeText={setDescription}
@@ -340,11 +308,11 @@ export default function NewPost() {
 
         {/* Submit button */}
         <TouchableOpacity 
-          style={[styles.submitButton, uploading && styles.submitButtonDisabled]}
+          style={[newPostStyles.submitButton, uploading && newPostStyles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={uploading}
         >
-          <Text style={styles.submitButtonText}>
+          <Text style={newPostStyles.submitButtonText}>
             {uploading ? 'Posting...' : 'Post Review'}
           </Text>
         </TouchableOpacity>
@@ -354,161 +322,3 @@ export default function NewPost() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  searchSection: {
-    marginBottom: 20,
-    zIndex: 1000,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    fontSize: 16,
-    paddingHorizontal: 15,
-    height: 50,
-  },
-  selectedPlace: {
-    backgroundColor: '#e8f5e9',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  selectedPlaceName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  selectedPlaceAddress: {
-    fontSize: 14,
-    color: '#666',
-  },
-  imageSection: {
-    marginBottom: 20,
-  },
-  image: {
-    width: '100%',
-    height: 250,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: 250,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  placeholderText: {
-    color: '#999',
-    fontSize: 16,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  imageButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  ratingSection: {
-    marginBottom: 20,
-  },
-  ratingButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  ratingButton: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  ratingButtonActive: {
-    backgroundColor: '#FFD700',
-  },
-  ratingButtonText: {
-    fontSize: 14,
-  },
-  descriptionSection: {
-    marginBottom: 20,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  submitButton: {
-    backgroundColor: '#34C759',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  suggestionsContainer: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    maxHeight: 200,
-    marginTop: 5,
-    zIndex: 1000,
-    elevation: 5,
-  },
-  suggestionItem: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  suggestionName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  suggestionAddress: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 3,
-  },
-});
