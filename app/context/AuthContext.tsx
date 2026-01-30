@@ -1,24 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, getAuth, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-
-// Define what user profile looks like in Firestore
-type UserProfile = {
-  name: string;
-  email: string;
-  profilePic: string;
-  friends: string[];
-  createdAt: string;
-};
-
-// Define what data the context provides
-type AuthContextType = {
-  isLoggedIn: boolean;
-  user: User | null;
-  userProfile: UserProfile | null;
-  loading: boolean;
-};
+import { UserProfile, AuthContextType } from '../../types/User';
+import { UserProfileService } from '../../services/auth/userProfileService';
 
 // Create the context box with default values
 const AuthContext = createContext<AuthContextType>({
@@ -43,20 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If user is logged in, fetch their profile from Firestore
       if (firebaseUser) {
         try {
-          // Get reference to user document in Firestore
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          
-          // Fetch the document
-          const userDoc = await getDoc(userDocRef);
-          
-          // Check if document exists
-          if (userDoc.exists()) {
-            // Get the data and store it in state
-            setUserProfile(userDoc.data() as UserProfile);
-          } else {
-            console.log('User profile not found in Firestore');
-            setUserProfile(null);
-          }
+          const profile = await UserProfileService.getUserProfile(firebaseUser.uid);
+          setUserProfile(profile);
         } catch (error) {
           console.error('Error fetching user profile:', error);
           setUserProfile(null);

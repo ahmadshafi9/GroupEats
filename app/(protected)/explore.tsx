@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
-  StyleSheet, 
   ActivityIndicator,
   TouchableOpacity,
   TextInput,
@@ -12,45 +11,37 @@ import {
   ScrollView
 } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-import { Post, PlaceWithReviews } from '../../types/Post';
+import { PlaceWithReviews } from '../../types/Post';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
+import { useLocation } from '../../hooks/useLocation';
+import { usePosts } from '../../hooks/usePosts';
+import { PlaceService } from '../../services/places/placeService';
+import { exploreStyles } from '../../styles/explore.styles';
 
 export default function Explore() {
-  const { user, userProfile } = useAuth();
+  const { userProfile } = useAuth();
   const mapRef = useRef<MapView>(null);
   
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const { location, loading: locationLoading, error: locationError } = useLocation();
+  const { posts } = usePosts({ enableRealtime: true });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlace, setSelectedPlace] = useState<PlaceWithReviews | null>(null);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
+  const [places, setPlaces] = useState<PlaceWithReviews[]>([]);
 
-  // Group posts by place
-  const placeMap = new Map<string, PlaceWithReviews>();
-  posts.forEach(post => {
-    if (!placeMap.has(post.placeId)) {
-      placeMap.set(post.placeId, {
-        placeId: post.placeId,
-        placeName: post.placeName,
-        placeAddress: post.placeAddress,
-        location: post.location,
-        posts: [],
-        averageRating: 0,
-      });
-    }
-    placeMap.get(post.placeId)!.posts.push(post);
-  });
-
-  // Calculate average ratings
-  const places: PlaceWithReviews[] = Array.from(placeMap.values()).map(place => ({
-    ...place,
-    averageRating: place.posts.reduce((sum, p) => sum + p.rating, 0) / place.posts.length,
-  }));
+  // Load places with reviews
+  useEffect(() => {
+    const loadPlaces = async () => {
+      try {
+        const placesData = await PlaceService.getAllPlacesWithReviews();
+        setPlaces(placesData);
+      } catch (error) {
+        console.error('Error loading places:', error);
+      }
+    };
+    loadPlaces();
+  }, [posts]);
 
   // Filter places by search query
   const filteredPlaces = searchQuery
@@ -60,49 +51,11 @@ export default function Explore() {
       )
     : places;
 
-  // Get user's current location
   useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Please enable location access to see places around you');
-          setLoading(false);
-          return;
-        }
-
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setLocation(currentLocation);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error getting location:', error);
-        Alert.alert('Error', 'Could not get your location');
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  // Load all posts
-  useEffect(() => {
-    const postsQuery = query(collection(db, 'posts'));
-
-    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
-      const postsData: Post[] = [];
-      
-      snapshot.forEach((doc) => {
-        postsData.push({
-          id: doc.id,
-          ...doc.data()
-        } as Post);
-      });
-
-      setPosts(postsData);
-    });
-
-    return unsubscribe;
-  }, []);
+    if (locationError) {
+      Alert.alert('Permission Denied', 'Please enable location access to see places around you');
+    }
+  }, [locationError]);
 
   // Center map on user location
   const centerOnUser = () => {
@@ -129,11 +82,11 @@ export default function Explore() {
     );
   };
 
-  if (loading) {
+  if (locationLoading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={exploreStyles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Getting your location...</Text>
+        <Text style={exploreStyles.loadingText}>Getting your location...</Text>
       </View>
     );
   }
@@ -151,21 +104,21 @@ export default function Explore() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={exploreStyles.container}>
       {/* Search Bar */}
-      <View style={styles.searchBar}>
+      <View style={exploreStyles.searchBar}>
         <TextInput
-          style={styles.searchInput}
+          style={exploreStyles.searchInput}
           placeholder="Search places..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery ? (
           <TouchableOpacity 
-            style={styles.clearButton}
+            style={exploreStyles.clearButton}
             onPress={() => setSearchQuery('')}
           >
-            <Text style={styles.clearButtonText}>✕</Text>
+            <Text style={exploreStyles.clearButtonText}>✕</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -174,7 +127,7 @@ export default function Explore() {
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
-        style={styles.map}
+        style={exploreStyles.map}
         initialRegion={initialRegion}
         showsUserLocation
         showsMyLocationButton={false}
@@ -194,13 +147,13 @@ export default function Explore() {
               onPress={() => handleMarkerPress(place)}
             >
               <Callout tooltip>
-                <View style={styles.callout}>
-                  <Text style={styles.calloutTitle}>{place.placeName}</Text>
-                  <Text style={styles.calloutRating}>
+                <View style={exploreStyles.callout}>
+                  <Text style={exploreStyles.calloutTitle}>{place.placeName}</Text>
+                  <Text style={exploreStyles.calloutRating}>
                     ⭐ {place.averageRating.toFixed(1)} ({place.posts.length} reviews)
                   </Text>
                   {isFriendPlace && (
-                    <Text style={styles.calloutFriend}>👥 Friends reviewed this</Text>
+                    <Text style={exploreStyles.calloutFriend}>👥 Friends reviewed this</Text>
                   )}
                 </View>
               </Callout>
@@ -211,21 +164,21 @@ export default function Explore() {
 
       {/* Center on User Button */}
       <TouchableOpacity 
-        style={styles.locationButton}
+        style={exploreStyles.locationButton}
         onPress={centerOnUser}
       >
-        <Text style={styles.locationButtonText}>📍</Text>
+        <Text style={exploreStyles.locationButtonText}>📍</Text>
       </TouchableOpacity>
 
       {/* Legend */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
-          <Text style={styles.legendText}>Friends reviewed</Text>
+      <View style={exploreStyles.legend}>
+        <View style={exploreStyles.legendItem}>
+          <View style={[exploreStyles.legendDot, { backgroundColor: '#34C759' }]} />
+          <Text style={exploreStyles.legendText}>Friends reviewed</Text>
         </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#FF3B30' }]} />
-          <Text style={styles.legendText}>Other places</Text>
+        <View style={exploreStyles.legendItem}>
+          <View style={[exploreStyles.legendDot, { backgroundColor: '#FF3B30' }]} />
+          <Text style={exploreStyles.legendText}>Other places</Text>
         </View>
       </View>
 
@@ -236,50 +189,50 @@ export default function Explore() {
         transparent={true}
         onRequestClose={() => setShowPlaceModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <View style={exploreStyles.modalOverlay}>
+          <View style={exploreStyles.modalContent}>
             {selectedPlace && (
               <>
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderText}>
-                    <Text style={styles.modalPlaceName}>{selectedPlace.placeName}</Text>
-                    <Text style={styles.modalPlaceAddress}>{selectedPlace.placeAddress}</Text>
+                <View style={exploreStyles.modalHeader}>
+                  <View style={exploreStyles.modalHeaderText}>
+                    <Text style={exploreStyles.modalPlaceName}>{selectedPlace.placeName}</Text>
+                    <Text style={exploreStyles.modalPlaceAddress}>{selectedPlace.placeAddress}</Text>
                   </View>
                   <TouchableOpacity 
-                    style={styles.closeButton}
+                    style={exploreStyles.closeButton}
                     onPress={() => setShowPlaceModal(false)}
                   >
-                    <Text style={styles.closeButtonText}>✕</Text>
+                    <Text style={exploreStyles.closeButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.modalStats}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statNumber}>⭐ {selectedPlace.averageRating.toFixed(1)}</Text>
-                    <Text style={styles.statLabel}>Rating</Text>
+                <View style={exploreStyles.modalStats}>
+                  <View style={exploreStyles.statBox}>
+                    <Text style={exploreStyles.statNumber}>⭐ {selectedPlace.averageRating.toFixed(1)}</Text>
+                    <Text style={exploreStyles.statLabel}>Rating</Text>
                   </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statNumber}>{selectedPlace.posts.length}</Text>
-                    <Text style={styles.statLabel}>Reviews</Text>
+                  <View style={exploreStyles.statBox}>
+                    <Text style={exploreStyles.statNumber}>{selectedPlace.posts.length}</Text>
+                    <Text style={exploreStyles.statLabel}>Reviews</Text>
                   </View>
                 </View>
 
-                <ScrollView style={styles.reviewsList}>
-                  <Text style={styles.reviewsTitle}>Recent Reviews:</Text>
+                <ScrollView style={exploreStyles.reviewsList}>
+                  <Text style={exploreStyles.reviewsTitle}>Recent Reviews:</Text>
                   {selectedPlace.posts.slice(0, 3).map((post) => {
                     const isFriend = userProfile?.friends.includes(post.userId);
                     return (
-                      <View key={post.id} style={styles.miniReview}>
-                        <Image source={{ uri: post.photoUrl }} style={styles.miniImage} />
-                        <View style={styles.miniReviewContent}>
-                          <View style={styles.miniReviewHeader}>
-                            <Text style={styles.miniReviewUser}>
+                      <View key={post.id} style={exploreStyles.miniReview}>
+                        <Image source={{ uri: post.photoUrl }} style={exploreStyles.miniImage} />
+                        <View style={exploreStyles.miniReviewContent}>
+                          <View style={exploreStyles.miniReviewHeader}>
+                            <Text style={exploreStyles.miniReviewUser}>
                               {post.userName}
-                              {isFriend && <Text style={styles.friendBadge}> 👥</Text>}
+                              {isFriend && <Text style={exploreStyles.friendBadge}> 👥</Text>}
                             </Text>
-                            <Text style={styles.miniReviewRating}>⭐ {post.rating}</Text>
+                            <Text style={exploreStyles.miniReviewRating}>⭐ {post.rating}</Text>
                           </View>
-                          <Text style={styles.miniReviewText} numberOfLines={2}>
+                          <Text style={exploreStyles.miniReviewText} numberOfLines={2}>
                             {post.description}
                           </Text>
                         </View>
@@ -289,7 +242,7 @@ export default function Explore() {
                 </ScrollView>
 
                 <TouchableOpacity
-                  style={styles.viewAllButton}
+                  style={exploreStyles.viewAllButton}
                   onPress={() => {
                     setShowPlaceModal(false);
                     router.push({
@@ -302,7 +255,7 @@ export default function Explore() {
                     });
                   }}
                 >
-                  <Text style={styles.viewAllButtonText}>View All Reviews</Text>
+                  <Text style={exploreStyles.viewAllButtonText}>View All Reviews</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -311,16 +264,14 @@ export default function Explore() {
       </Modal>
 
       {/* Stats Bar */}
-      <View style={styles.statsBar}>
-        <Text style={styles.statsText}>
+      <View style={exploreStyles.statsBar}>
+        <Text style={exploreStyles.statsText}>
           {places.length} places • {posts.length} reviews
         </Text>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
   container: {
     flex: 1,
   },

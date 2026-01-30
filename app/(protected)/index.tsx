@@ -1,19 +1,23 @@
-import { View, Text, Button, StyleSheet } from 'react-native';
-import { signOut } from 'firebase/auth';
+import { View, Text, Button } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../../firebaseConfig';
+import { AuthService } from '../../services/auth/authService';
 import { router } from 'expo-router';
+import { commonStyles } from '../../styles/common.styles';
 
 export default function ProtectedHome() {
   const { userProfile } = useAuth();
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    try {
+      await AuthService.signOutUser();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.welcome}>
+    <View style={commonStyles.container}>
+      <Text style={commonStyles.welcome}>
         Welcome, {userProfile?.name || 'User'}!
       </Text>
       
@@ -36,18 +40,3 @@ export default function ProtectedHome() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    gap: 15,
-  },
-  welcome: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-});
