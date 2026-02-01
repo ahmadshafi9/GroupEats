@@ -45,11 +45,15 @@ export class UserProfileService {
 
       return null;
     } catch (error) {
-      throw new Error(
-        error instanceof Error 
-          ? error.message 
-          : 'Failed to fetch user profile'
-      );
+      // Re-throw with more context
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user profile';
+      
+      // Check if it's an offline error
+      if (errorMessage.includes('offline') || errorMessage.includes('network')) {
+        throw new Error(`Firestore is offline: ${errorMessage}`);
+      }
+      
+      throw new Error(errorMessage);
     }
   }
 

@@ -46,6 +46,13 @@ export default function ProtectedLayout() {
           headerBackTitle: 'Back'
         }} 
       />
+      <Stack.Screen 
+        name="dining-hall" 
+        options={{ 
+          headerTitle: '🍽️ Dining Hall',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack>
   );
 }
