@@ -97,13 +97,35 @@ export default function NewPost() {
   };
 
 
-  // Submit post
+  const useManualPlace = () => {
+    if (!placeName.trim()) return;
+    setSelectedPlace({
+      placeId: placeName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: placeName.trim(),
+      address: placeName.trim(),
+      lat: 0,
+      lng: 0,
+      types: ['establishment'],
+    });
+    setShowSuggestions(false);
+  };
+
   const handleSubmit = async () => {
-    // Validation
-    if (!selectedPlace) {
-      Alert.alert('Error', 'Please search and select a place');
+    if (!selectedPlace && !placeName.trim()) {
+      Alert.alert('Error', 'Please enter a place name');
       return;
     }
+    if (!selectedPlace && placeName.trim()) {
+      useManualPlace();
+    }
+    const place = selectedPlace || {
+      placeId: placeName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: placeName.trim(),
+      address: placeName.trim(),
+      lat: 0,
+      lng: 0,
+      types: ['establishment'],
+    };
     if (!imageUri) {
       Alert.alert('Error', 'Please add a photo');
       return;
@@ -124,25 +146,20 @@ export default function NewPost() {
       // Upload image
       const photoUrl = await ImageUploadService.uploadPostImage(imageUri, user.uid);
 
-      // Create post in Firestore
       await PostService.createPost({
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
         userProfilePic: userProfile?.profilePic || '',
-        
-        // Google Place data
-        placeId: selectedPlace.placeId,
-        placeName: selectedPlace.name,
-        placeAddress: selectedPlace.address,
-        placeTypes: selectedPlace.types,
-        
+        placeId: place.placeId,
+        placeName: place.name,
+        placeAddress: place.address,
+        placeTypes: place.types,
         description: description.trim(),
         rating: parseFloat(rating),
         photoUrl,
-        
         location: {
-          latitude: selectedPlace.lat,
-          longitude: selectedPlace.lng,
+          latitude: place.lat,
+          longitude: place.lng,
         },
       });
 
@@ -182,7 +199,6 @@ export default function NewPost() {
               onFocus={() => setShowSuggestions(true)}
             />
             
-            {/* Dropdown suggestions */}
             {showSuggestions && filteredSuggestions.length > 0 && (
               <View style={newPostStyles.suggestionsContainer}>
                 {filteredSuggestions.map((place, index) => (
@@ -207,6 +223,16 @@ export default function NewPost() {
                   </TouchableOpacity>
                 ))}
               </View>
+            )}
+            {placeName.trim().length > 0 && !selectedPlace && (
+              <TouchableOpacity
+                style={{ backgroundColor: '#007AFF', borderRadius: 8, padding: 12, marginTop: 8 }}
+                onPress={useManualPlace}
+              >
+                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>
+                  Use "{placeName.trim()}" as place name
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
           

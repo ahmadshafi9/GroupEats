@@ -6,7 +6,6 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -14,40 +13,17 @@ import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
 import { PostService } from '../../services/posts/postService';
 import { ImageUploadService } from '../../services/storage/imageUploadService';
-import { GooglePlacesService } from '../../services/places/googlePlacesService';
 import { Validation } from '../../utils/validation';
-import { SelectedPlace } from '../../types/Place';
-import { PlaceDetails } from '../../types/Place';
 
 export default function NewPostWeb() {
   const { user, userProfile } = useAuth();
 
-  const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
   const [placeName, setPlaceName] = useState('');
-  const [searchResults, setSearchResults] = useState<PlaceDetails[]>([]);
-  const [searching, setSearching] = useState(false);
-
+  const [placeAddress, setPlaceAddress] = useState('');
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState('5');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-
-  const searchPlaces = async (query: string) => {
-    setPlaceName(query);
-    if (query.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const results = await GooglePlacesService.searchPlaces(query);
-      setSearchResults(results);
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  };
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -67,7 +43,7 @@ export default function NewPostWeb() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedPlace) { alert('Please search and select a place'); return; }
+    if (!placeName.trim()) { alert('Please enter a place name'); return; }
     if (!imageUri) { alert('Please add a photo'); return; }
     if (!Validation.isRequired(description)) { alert('Please write a review'); return; }
     if (!user?.uid) { alert('You must be logged in to post'); return; }
@@ -75,18 +51,19 @@ export default function NewPostWeb() {
     setUploading(true);
     try {
       const photoUrl = await ImageUploadService.uploadPostImage(imageUri, user.uid);
+      const placeId = placeName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
       await PostService.createPost({
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
         userProfilePic: userProfile?.profilePic || '',
-        placeId: selectedPlace.placeId,
-        placeName: selectedPlace.name,
-        placeAddress: selectedPlace.address,
-        placeTypes: selectedPlace.types,
+        placeId,
+        placeName: placeName.trim(),
+        placeAddress: placeAddress.trim() || placeName.trim(),
+        placeTypes: ['restaurant'],
         description: description.trim(),
         rating: parseFloat(rating),
         photoUrl,
-        location: { latitude: selectedPlace.lat, longitude: selectedPlace.lng },
+        location: { latitude: 0, longitude: 0 },
       });
       alert('Review posted!');
       router.back();
@@ -101,57 +78,43 @@ export default function NewPostWeb() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Review a Place</Text>
 
-      <Text style={styles.label}>Search for a place</Text>
+      <Text style={styles.label}>Place name</Text>
       <TextInput
         style={styles.input}
-        placeholder="Search restaurants, cafes..."
+        placeholder={"e.g. Breka, Chipotle, Joe's Pizza..."}
         value={placeName}
-        onChangeText={searchPlaces}
+        onChangeText={setPlaceName}
       />
-      {searching && <ActivityIndicator style={{ marginVertical: 8 }} />}
-      {searchResults.length > 0 && (
-        <View style={styles.suggestions}>
-          {searchResults.slice(0, 5).map((place) => (
-            <TouchableOpacity
-              key={place.placeId}
-              style={styles.suggestionItem}
-              onPress={() => {
-                setSelectedPlace({
-                  placeId: place.placeId,
-                  name: place.name,
-                  address: place.address,
-                  lat: place.location.latitude,
-                  lng: place.location.longitude,
-                  types: place.types,
-                });
-                setPlaceName(place.name);
-                setSearchResults([]);
-              }}
-            >
-              <Text style={styles.suggestionName}>{place.name}</Text>
-              <Text style={styles.suggestionAddress}>{place.address}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-      {selectedPlace && (
+
+      <Text style={styles.label}>Address or neighborhood (optional)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="e.g. Downtown, Main St..."
+        value={placeAddress}
+        onChangeText={setPlaceAddress}
+      />
+
+      {placeName.trim().length > 0 && (
         <View style={styles.selectedPlace}>
-          <Text style={styles.selectedName}>✅ {selectedPlace.name}</Text>
-          <Text style={styles.selectedAddress}>{selectedPlace.address}</Text>
+          <Text style={styles.selectedName}>📍 {placeName.trim()}</Text>
+          {placeAddress.trim() ? (
+            <Text style={styles.selectedAddress}>{placeAddress.trim()}</Text>
+          ) : null}
         </View>
       )}
 
       <Text style={styles.label}>Add a photo</Text>
       {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.image} />
+        <TouchableOpacity onPress={pickImage}>
+          <Image source={{ uri: imageUri }} style={styles.image} />
+          <Text style={styles.changePhotoHint}>Tap to change</Text>
+        </TouchableOpacity>
       ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.placeholderText}>No photo selected</Text>
-        </View>
+        <TouchableOpacity style={styles.imagePlaceholder} onPress={pickImage}>
+          <Text style={styles.placeholderIcon}>📷</Text>
+          <Text style={styles.placeholderText}>Tap to choose a photo</Text>
+        </TouchableOpacity>
       )}
-      <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-        <Text style={styles.imageButtonText}>Choose from Gallery</Text>
-      </TouchableOpacity>
 
       <Text style={styles.label}>Your rating</Text>
       <View style={styles.ratingRow}>
@@ -164,7 +127,14 @@ export default function NewPostWeb() {
             ]}
             onPress={() => setRating(num.toString())}
           >
-            <Text style={styles.ratingText}>{num} ⭐</Text>
+            <Text
+              style={[
+                styles.ratingText,
+                rating === num.toString() && styles.ratingTextActive,
+              ]}
+            >
+              {'⭐'.repeat(num)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -188,56 +158,93 @@ export default function NewPostWeb() {
           {uploading ? 'Posting...' : 'Post Review'}
         </Text>
       </TouchableOpacity>
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
-  content: { padding: 20, paddingTop: 60, maxWidth: 600, alignSelf: 'center', width: '100%' },
-  title: { fontSize: 28, fontWeight: '700', color: '#1a1a2e', marginBottom: 24 },
-  label: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 20, marginBottom: 8 },
+  content: {
+    padding: 20,
+    paddingTop: 60,
+    maxWidth: 560,
+    alignSelf: 'center' as const,
+    width: '100%',
+  },
+  title: { fontSize: 28, fontWeight: '700', color: '#1a1a2e', marginBottom: 8 },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginTop: 20,
+    marginBottom: 6,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
   input: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14, fontSize: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
-  suggestions: {
-    backgroundColor: '#fff', borderRadius: 12, marginTop: 4, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-  },
-  suggestionItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  suggestionName: { fontSize: 15, fontWeight: '600', color: '#1a1a2e' },
-  suggestionAddress: { fontSize: 13, color: '#888', marginTop: 2 },
   selectedPlace: {
-    backgroundColor: '#e8f5e9', borderRadius: 12, padding: 14, marginTop: 12,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
   },
-  selectedName: { fontSize: 15, fontWeight: '600', color: '#2e7d32' },
+  selectedName: { fontSize: 16, fontWeight: '600', color: '#2e7d32' },
   selectedAddress: { fontSize: 13, color: '#555', marginTop: 4 },
-  image: { width: '100%', height: 200, borderRadius: 12 },
+  image: { width: '100%', height: 220, borderRadius: 12 },
+  changePhotoHint: {
+    textAlign: 'center' as const,
+    color: '#888',
+    fontSize: 13,
+    marginTop: 6,
+  },
   imagePlaceholder: {
-    width: '100%', height: 200, borderRadius: 12, backgroundColor: '#e9ecef',
-    justifyContent: 'center', alignItems: 'center',
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#dee2e6',
+    borderStyle: 'dashed' as const,
   },
-  placeholderText: { color: '#999', fontSize: 15 },
-  imageButton: {
-    backgroundColor: '#007AFF', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12,
-  },
-  imageButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  ratingRow: { flexDirection: 'row', gap: 8 },
+  placeholderIcon: { fontSize: 36, marginBottom: 8 },
+  placeholderText: { color: '#888', fontSize: 15 },
+  ratingRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   ratingButton: {
-    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     backgroundColor: '#e9ecef',
   },
-  ratingActive: { backgroundColor: '#FFD60A' },
-  ratingText: { fontSize: 15, fontWeight: '600' },
+  ratingActive: { backgroundColor: '#FFF3C4', borderWidth: 2, borderColor: '#FFD60A' },
+  ratingText: { fontSize: 14 },
+  ratingTextActive: { fontWeight: '700' },
   textArea: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14, fontSize: 16,
-    minHeight: 120, textAlignVertical: 'top',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    minHeight: 120,
+    textAlignVertical: 'top' as const,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   submitButton: {
-    backgroundColor: '#34C759', borderRadius: 14, padding: 16, alignItems: 'center',
-    marginTop: 24, marginBottom: 40,
+    backgroundColor: '#34C759',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 28,
   },
   submitText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 });
