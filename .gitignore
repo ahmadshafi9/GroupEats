@@ -35,6 +35,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Firebase service account keys
+*-firebase-adminsdk-*.json
+
 # local env files
 .env*.local
 
