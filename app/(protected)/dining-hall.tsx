@@ -14,7 +14,6 @@ import { useAuth } from '../context/AuthContext';
 import { DiningHallService } from '../../services/diningHall/diningHallService';
 import { UserProfileService } from '../../services/auth/userProfileService';
 import { DiningHallEvent } from '../../types/DiningHall';
-import { UserProfile } from '../../types/User';
 import { CountdownTimer } from '../../components/diningHall/CountdownTimer';
 import { Theme } from '../../constants/theme';
 
@@ -26,6 +25,7 @@ export default function DiningHallScreen() {
   const [creating, setCreating] = useState(false);
   const [customMinutes, setCustomMinutes] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [expandedExtend, setExpandedExtend] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -53,9 +53,7 @@ export default function DiningHallScreen() {
       const map: Record<string, string> = {};
       profiles.forEach((p) => { map[p.uid] = p.name; });
       setParticipantNames((prev) => ({ ...prev, ...map }));
-    } catch {
-      // silently fail
-    }
+    } catch {}
   };
 
   const handleCreateEvent = async (minutes: number) => {
@@ -81,15 +79,19 @@ export default function DiningHallScreen() {
     }
   };
 
-  const handleLeaveEvent = async (event: DiningHallEvent) => {
+  const handleLeaveEvent = async (eventId: string) => {
     if (!user?.uid) return;
     try {
-      const { doc, updateDoc } = require('firebase/firestore');
-      const { db } = require('../../firebaseConfig');
-      const eventRef = doc(db, 'diningHallEvents', event.id);
-      await updateDoc(eventRef, {
-        participants: event.participants.filter((p: string) => p !== user.uid),
-      });
+      await DiningHallService.leaveEvent(eventId, user.uid);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleExtend = async (eventId: string, minutes: number) => {
+    try {
+      await DiningHallService.extendEvent(eventId, minutes);
+      setExpandedExtend(null);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -111,6 +113,57 @@ export default function DiningHallScreen() {
   const myEvent = events.find((e) => e.creatorId === user?.uid);
   const otherEvents = events.filter((e) => e.creatorId !== user?.uid);
 
+  const renderExtendRow = (eventId: string) => {
+    const isOpen = expandedExtend === eventId;
+    return (
+      <View style={styles.extendSection}>
+        {isOpen ? (
+          <View>
+            <Text style={styles.extendLabel}>Extend by:</Text>
+            <View style={styles.extendOptions}>
+              {[5, 10, 15, 30].map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={styles.extendChip}
+                  onPress={() => handleExtend(eventId, m)}
+                >
+                  <Text style={styles.extendChipText}>+{m}m</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.extendChipCancel}
+                onPress={() => setExpandedExtend(null)}
+              >
+                <Text style={styles.extendChipCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.extendBtn}
+            onPress={() => setExpandedExtend(eventId)}
+          >
+            <Text style={styles.extendBtnText}>Extend Time</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  const renderParticipants = (event: DiningHallEvent) => (
+    <View style={styles.participantsList}>
+      <Text style={styles.goingLabel}>
+        Going ({event.participants.length}):
+      </Text>
+      {event.participants.map((uid) => (
+        <View key={uid} style={styles.participantRow}>
+          <View style={styles.dot} />
+          <Text style={styles.participantName}>{getName(uid)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <ScrollView
       style={styles.container}
@@ -120,7 +173,6 @@ export default function DiningHallScreen() {
       <Text style={styles.title}>Dining Hall</Text>
       <Text style={styles.subtitle}>See who's going and join them</Text>
 
-      {/* Create / Your Event Section */}
       {myEvent ? (
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
@@ -132,17 +184,14 @@ export default function DiningHallScreen() {
             targetTime={myEvent.targetTime}
             onComplete={() => DiningHallService.completeEvent(myEvent.id)}
           />
-          <View style={styles.participantsList}>
-            <Text style={styles.goingLabel}>
-              Going ({myEvent.participants.length}):
-            </Text>
-            {myEvent.participants.map((uid) => (
-              <View key={uid} style={styles.participantRow}>
-                <View style={styles.dot} />
-                <Text style={styles.participantName}>{getName(uid)}</Text>
-              </View>
-            ))}
-          </View>
+          {renderParticipants(myEvent)}
+          {renderExtendRow(myEvent.id)}
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => DiningHallService.completeEvent(myEvent.id)}
+          >
+            <Text style={styles.cancelBtnText}>Cancel Event</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.card}>
@@ -198,7 +247,6 @@ export default function DiningHallScreen() {
         </View>
       )}
 
-      {/* Other Active Events */}
       {otherEvents.length > 0 && (
         <Text style={styles.sectionTitle}>
           Active Events ({otherEvents.length})
@@ -216,21 +264,12 @@ export default function DiningHallScreen() {
               <Text style={styles.eventCreatorSub}>is heading to the dining hall</Text>
             </View>
             <CountdownTimer targetTime={event.targetTime} />
-            <View style={styles.participantsList}>
-              <Text style={styles.goingLabel}>
-                Going ({event.participants.length}):
-              </Text>
-              {event.participants.map((uid) => (
-                <View key={uid} style={styles.participantRow}>
-                  <View style={styles.dot} />
-                  <Text style={styles.participantName}>{getName(uid)}</Text>
-                </View>
-              ))}
-            </View>
+            {renderParticipants(event)}
+            {isJoined && renderExtendRow(event.id)}
             {isJoined ? (
               <TouchableOpacity
                 style={styles.leaveBtn}
-                onPress={() => handleLeaveEvent(event)}
+                onPress={() => handleLeaveEvent(event.id)}
               >
                 <Text style={styles.leaveBtnText}>Leave</Text>
               </TouchableOpacity>
@@ -335,11 +374,37 @@ const styles = StyleSheet.create({
   joinBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   leaveBtn: {
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: Theme.colors.danger,
-    paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 14,
+    paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 10,
   },
   leaveBtnText: { color: Theme.colors.danger, fontSize: 15, fontWeight: '600' },
+  cancelBtn: {
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: Theme.colors.danger,
+    paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 10,
+  },
+  cancelBtnText: { color: Theme.colors.danger, fontSize: 15, fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingTop: 40 },
   emptyIcon: { fontSize: 48 },
   emptyText: { fontSize: 18, fontWeight: '600', color: Theme.colors.text, marginTop: 16 },
   emptySubtext: { fontSize: 14, color: Theme.colors.textSecondary, marginTop: 6 },
+  extendSection: { marginTop: 12 },
+  extendBtn: {
+    backgroundColor: '#fff3e0', paddingVertical: 12,
+    borderRadius: 12, alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#ff9800',
+  },
+  extendBtnText: { color: '#e65100', fontSize: 15, fontWeight: '600' },
+  extendLabel: {
+    fontSize: 13, fontWeight: '600', color: Theme.colors.textSecondary, marginBottom: 8,
+  },
+  extendOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  extendChip: {
+    backgroundColor: '#ff9800', paddingVertical: 10,
+    paddingHorizontal: 18, borderRadius: 10,
+  },
+  extendChipText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  extendChipCancel: {
+    backgroundColor: '#f0f0f0', paddingVertical: 10,
+    paddingHorizontal: 16, borderRadius: 10,
+  },
+  extendChipCancelText: { color: Theme.colors.textSecondary, fontSize: 14, fontWeight: '600' },
 });

@@ -145,6 +145,39 @@ export class DiningHallService {
     }
   }
 
+  static async extendEvent(eventId: string, extraMinutes: number): Promise<void> {
+    try {
+      const eventRef = doc(db, 'diningHallEvents', eventId);
+      const eventSnap = await getDoc(eventRef);
+      if (!eventSnap.exists()) throw new Error('Event not found');
+      const data = eventSnap.data();
+      const newTarget = new Date(
+        new Date(data.targetTime).getTime() + extraMinutes * 60 * 1000
+      ).toISOString();
+      await updateDoc(eventRef, { targetTime: newTarget });
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to extend event'
+      );
+    }
+  }
+
+  static async leaveEvent(eventId: string, userId: string): Promise<void> {
+    try {
+      const eventRef = doc(db, 'diningHallEvents', eventId);
+      const eventSnap = await getDoc(eventRef);
+      if (!eventSnap.exists()) throw new Error('Event not found');
+      const data = eventSnap.data();
+      await updateDoc(eventRef, {
+        participants: (data.participants || []).filter((p: string) => p !== userId),
+      });
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to leave event'
+      );
+    }
+  }
+
   /**
    * Complete an event
    */
