@@ -1,14 +1,21 @@
-// Dining Hall event types
+export type ExtendRequest = {
+  requesterId: string;
+  minutes: number;
+  status: 'pending' | 'approved' | 'denied';
+  createdAt: string;
+};
+
 export type DiningHallEvent = {
   id: string;
   creatorId: string;
   creatorName: string;
-  targetTime: string; // ISO timestamp
-  customMinutes?: number; // For custom time selection
-  participants: string[]; // Array of user IDs
+  targetTime: string;
+  customMinutes?: number;
+  participants: string[];
   status: 'active' | 'completed' | 'cancelled';
   createdAt: string;
-  notificationsSent: string[]; // Array of user IDs who received notifications
+  notificationsSent: string[];
+  extendRequests?: ExtendRequest[];
 };
 
 export type DiningHallInvitation = {

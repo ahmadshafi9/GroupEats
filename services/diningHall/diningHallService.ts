@@ -1,6 +1,6 @@
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, getDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { DiningHallEvent } from '../../types/DiningHall';
+import { DiningHallEvent, ExtendRequest } from '../../types/DiningHall';
 
 /**
  * Dining Hall service
@@ -145,6 +145,59 @@ export class DiningHallService {
     }
   }
 
+  static async requestExtend(eventId: string, requesterId: string, minutes: number): Promise<void> {
+    try {
+      const eventRef = doc(db, 'diningHallEvents', eventId);
+      const eventSnap = await getDoc(eventRef);
+      if (!eventSnap.exists()) throw new Error('Event not found');
+      const data = eventSnap.data();
+      const existing: ExtendRequest[] = data.extendRequests || [];
+      const newReq: ExtendRequest = {
+        requesterId,
+        minutes,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      await updateDoc(eventRef, { extendRequests: [...existing, newReq] });
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to request extension');
+    }
+  }
+
+  static async approveExtend(eventId: string, requestIndex: number): Promise<void> {
+    try {
+      const eventRef = doc(db, 'diningHallEvents', eventId);
+      const eventSnap = await getDoc(eventRef);
+      if (!eventSnap.exists()) throw new Error('Event not found');
+      const data = eventSnap.data();
+      const requests: ExtendRequest[] = [...(data.extendRequests || [])];
+      const req = requests[requestIndex];
+      if (!req || req.status !== 'pending') return;
+      requests[requestIndex] = { ...req, status: 'approved' };
+      const newTarget = new Date(
+        new Date(data.targetTime).getTime() + req.minutes * 60 * 1000
+      ).toISOString();
+      await updateDoc(eventRef, { targetTime: newTarget, extendRequests: requests });
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to approve extension');
+    }
+  }
+
+  static async denyExtend(eventId: string, requestIndex: number): Promise<void> {
+    try {
+      const eventRef = doc(db, 'diningHallEvents', eventId);
+      const eventSnap = await getDoc(eventRef);
+      if (!eventSnap.exists()) throw new Error('Event not found');
+      const data = eventSnap.data();
+      const requests: ExtendRequest[] = [...(data.extendRequests || [])];
+      if (!requests[requestIndex] || requests[requestIndex].status !== 'pending') return;
+      requests[requestIndex] = { ...requests[requestIndex], status: 'denied' };
+      await updateDoc(eventRef, { extendRequests: requests });
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to deny extension');
+    }
+  }
+
   static async extendEvent(eventId: string, extraMinutes: number): Promise<void> {
     try {
       const eventRef = doc(db, 'diningHallEvents', eventId);
@@ -156,9 +209,7 @@ export class DiningHallService {
       ).toISOString();
       await updateDoc(eventRef, { targetTime: newTarget });
     } catch (error) {
-      throw new Error(
-        error instanceof Error ? error.message : 'Failed to extend event'
-      );
+      throw new Error(error instanceof Error ? error.message : 'Failed to extend event');
     }
   }
 
