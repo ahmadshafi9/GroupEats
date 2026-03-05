@@ -8,11 +8,11 @@ export type UserProfile = {
   createdAt: string;
 };
 
-// Auth context type
 export type AuthContextType = {
   isLoggedIn: boolean;
   user: import('firebase/auth').User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 };
 

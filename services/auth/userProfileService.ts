@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { UserProfile } from '../../types/User';
 
@@ -99,9 +99,33 @@ export class UserProfileService {
     }
   }
 
-  /**
-   * Remove a friend from user's friends list
-   */
+  static async getAllUsers(): Promise<UserProfile[]> {
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      return snapshot.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile));
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to fetch users'
+      );
+    }
+  }
+
+  static async getUserProfiles(uids: string[]): Promise<UserProfile[]> {
+    if (uids.length === 0) return [];
+    try {
+      const profiles: UserProfile[] = [];
+      for (const uid of uids) {
+        const profile = await UserProfileService.getUserProfile(uid);
+        if (profile) profiles.push(profile);
+      }
+      return profiles;
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to fetch user profiles'
+      );
+    }
+  }
+
   static async removeFriend(userId: string, friendId: string): Promise<void> {
     try {
       const userDocRef = doc(db, 'users', userId);

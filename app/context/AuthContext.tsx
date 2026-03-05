@@ -9,6 +9,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
   loading: true,
+  refreshProfile: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -80,13 +81,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    try {
+      const profile = await UserProfileService.getUserProfile(user.uid);
+      if (profile) setUserProfile(profile);
+    } catch {
+      // silently fail on refresh
+    }
+  };
+
   return (
     <AuthContext.Provider 
       value={{ 
         isLoggedIn: !!user, 
         user, 
         userProfile,
-        loading: initializing 
+        loading: initializing,
+        refreshProfile,
       }}
     >
       {children}

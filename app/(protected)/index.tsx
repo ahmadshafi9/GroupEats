@@ -60,6 +60,19 @@ export default function ProtectedHome() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity
+          style={styles.friendsButton}
+          onPress={() => router.push('./friends')}
+        >
+          <Text style={styles.friendsEmoji}>👥</Text>
+          <View>
+            <Text style={styles.friendsTitle}>Friends</Text>
+            <Text style={styles.friendsSubtitle}>
+              {userProfile?.friends?.length || 0} friends · Find &amp; add people
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
@@ -129,6 +142,29 @@ const styles = StyleSheet.create({
     fontSize: Theme.fontSize.sm,
     fontWeight: Theme.fontWeight.semibold,
     color: Theme.colors.text,
+  },
+  friendsButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.md,
+    padding: Theme.spacing.lg,
+    marginBottom: Theme.spacing.xl,
+    gap: 14,
+    ...Theme.shadow.small,
+  },
+  friendsEmoji: {
+    fontSize: 32,
+  },
+  friendsTitle: {
+    fontSize: Theme.fontSize.lg,
+    fontWeight: Theme.fontWeight.semibold,
+    color: Theme.colors.text,
+  },
+  friendsSubtitle: {
+    fontSize: Theme.fontSize.sm,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
   signOutButton: {
     backgroundColor: Theme.colors.danger,

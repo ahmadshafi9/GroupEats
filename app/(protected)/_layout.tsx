@@ -53,6 +53,13 @@ export default function ProtectedLayout() {
           headerBackTitle: 'Back'
         }} 
       />
+      <Stack.Screen 
+        name="friends" 
+        options={{ 
+          headerTitle: '👥 Friends',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack>
   );
 }
