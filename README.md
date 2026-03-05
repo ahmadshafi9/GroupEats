@@ -9,8 +9,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-12.5-DD2C00?logo=firebase&logoColor=white)](https://firebase.google.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-▶_Try_It-00C853?style=flat&logo=vercel&logoColor=white)](https://groupeats-rho.vercel.app)
 
-[Features](#features) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Getting Started](#getting-started) · [Project Structure](#project-structure)
+[Live Demo](https://groupeats-rho.vercel.app) · [Features](#features) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Getting Started](#getting-started) · [Project Structure](#project-structure)
 
 </div>
 
@@ -271,6 +272,23 @@ groupeats/
 - [ ] Offline sync support
 - [ ] Cloud Functions for aggregations
 - [ ] Full-text search (Algolia)
+
+---
+
+## Web Demo
+
+A live web build is available at **[groupeats-rho.vercel.app](https://groupeats-rho.vercel.app)** for quick access without installing anything.
+
+> **Note:** The web version is a preview of the mobile app. A few native-only features behave differently on web:
+>
+> | Feature | Web Behavior |
+> |---|---|
+> | Interactive Map (Explore) | Replaced with a list-based place browser — `react-native-maps` is native-only |
+> | Camera capture | Not available — gallery upload still works |
+> | Google Places Autocomplete | Uses text search fallback instead of the native autocomplete widget |
+> | Push notifications | Not wired on any platform yet |
+>
+> For the full experience, build and run the app on iOS or Android using `npx expo start`.
 
 ---
 
