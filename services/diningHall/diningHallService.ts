@@ -100,7 +100,7 @@ export class DiningHallService {
   }
 
   /**
-   * Subscribe to active events (real-time)
+   * Subscribe to ALL active events (real-time) so users can discover and join
    */
   static subscribeToActiveEvents(
     userId: string,
@@ -112,19 +112,17 @@ export class DiningHallService {
     );
 
     return onSnapshot(eventsQuery, (snapshot) => {
+      const now = Date.now();
       const events: DiningHallEvent[] = [];
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.creatorId === userId || (data.participants || []).includes(userId)) {
-          events.push({
-            id: doc.id,
-            ...data,
-          } as DiningHallEvent);
+      snapshot.forEach((d) => {
+        const data = d.data();
+        if (new Date(data.targetTime).getTime() > now) {
+          events.push({ id: d.id, ...data } as DiningHallEvent);
         }
       });
 
-      callback(events.sort((a, b) => 
+      callback(events.sort((a, b) =>
         new Date(a.targetTime).getTime() - new Date(b.targetTime).getTime()
       ));
     });
