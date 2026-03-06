@@ -1,9 +1,13 @@
-export type ExtendRequest = {
+export type TimeChangeRequest = {
   requesterId: string;
   minutes: number;
+  type: 'extend' | 'prepone';
   status: 'pending' | 'approved' | 'denied';
   createdAt: string;
 };
+
+/** @deprecated use TimeChangeRequest */
+export type ExtendRequest = TimeChangeRequest;
 
 export type DiningHallEvent = {
   id: string;
@@ -15,7 +19,7 @@ export type DiningHallEvent = {
   status: 'active' | 'completed' | 'cancelled';
   createdAt: string;
   notificationsSent: string[];
-  extendRequests?: ExtendRequest[];
+  extendRequests?: TimeChangeRequest[];
 };
 
 export type DiningHallInvitation = {
