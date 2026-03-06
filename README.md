@@ -2,7 +2,7 @@
 
 # GroupEats
 
-### Discover, review, and share restaurant experiences with friends.
+### Discover, review, and share restaurant experiences with friends — then go eat together.
 
 [![React Native](https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react&logoColor=white)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo_SDK_54-000020?logo=expo&logoColor=white)](https://expo.dev/)
@@ -19,9 +19,9 @@
 
 ## Overview
 
-**GroupEats** is a full-stack mobile application built with React Native and Firebase that turns dining into a social experience. Users can discover nearby restaurants on an interactive map, post photo reviews with star ratings, and see what their friends are eating — all in real time.
+**GroupEats** is a full-stack mobile + web application built with React Native and Firebase that turns dining into a social experience. Users can discover nearby restaurants on an interactive map, post photo reviews with star ratings, manage a friends list, coordinate dining hall trips with real-time countdowns, and negotiate timing through an extend/prepone approval system — all in real time.
 
-The app was designed with a clean layered architecture, a dedicated service layer for business logic, and real-time Firestore subscriptions — demonstrating production-level patterns for mobile development.
+The app is built with a clean layered architecture, a dedicated service layer for all business logic, real-time Firestore subscriptions, and deployed Firestore security rules — demonstrating production-level patterns for mobile and web development.
 
 ---
 
@@ -31,12 +31,16 @@ The app was designed with a clean layered architecture, a dedicated service laye
 |---|---|
 | **Social Feed** | Real-time feed of restaurant reviews with photos, ratings, likes, and pull-to-refresh / infinite scroll |
 | **Interactive Map** | Explore nearby restaurants on a live map with color-coded markers (friends vs. others) |
-| **Place Search** | Google Places Autocomplete for fast restaurant discovery |
+| **Place Search** | Google Places Autocomplete for fast restaurant discovery; manual entry fallback on web |
 | **Photo Reviews** | Create reviews with camera/gallery photos, 1–5 star ratings, and text descriptions |
 | **Place Detail** | Aggregated view of all reviews for a restaurant — yours, friends', and others' |
-| **Dining Hall Events** | Broadcast "going to eat" events with countdown timers and friend notifications |
-| **Auth & Profiles** | Email/password authentication with persistent sessions and user profiles |
-| **Friend System** | Data model supports friend-based filtering and social features |
+| **Friends Management** | Search all users, add/remove friends with mutual updates, view friends list with friend count |
+| **Dining Hall Events** | Broadcast "going to eat" events with live countdown timers visible to all users |
+| **Join / Leave Events** | Anyone can join an active dining hall event; participants see real names and can leave anytime |
+| **Extend / Prepone Requests** | Participants can request to push the time back (extend) or forward (prepone / "I'm hungry"); event owner approves or denies each request |
+| **Custom Timing** | Both event creation and time-change requests support preset options (5/10/15/30 min) and custom minute input |
+| **Auth & Profiles** | Email/password authentication with persistent sessions, auto-created Firestore profiles, and profile refresh |
+| **Web Deployment** | Live web build on Vercel with platform-specific UI fallbacks for native-only features |
 
 ---
 
@@ -48,6 +52,7 @@ The app follows a **layered architecture** that cleanly separates concerns:
 ┌──────────────────────────────────────────────────────┐
 │              Presentation Layer                       │
 │         Expo Router screens & components              │
+│         (platform-specific .web.tsx where needed)     │
 ├──────────────────────────────────────────────────────┤
 │              State Management                        │
 │         React Context (AuthContext)                   │
@@ -56,7 +61,8 @@ The app follows a **layered architecture** that cleanly separates concerns:
 │       usePosts · usePlace · useLocation              │
 ├──────────────────────────────────────────────────────┤
 │              Service Layer                           │
-│  Auth · Posts · Places · Storage · Location · Dining │
+│  Auth · UserProfile · Posts · Places · Storage       │
+│  Location · DiningHall · Notifications               │
 ├──────────────────────────────────────────────────────┤
 │              Data / External Services                │
 │    Firestore · Firebase Auth · Cloud Storage         │
@@ -69,8 +75,9 @@ The app follows a **layered architecture** that cleanly separates concerns:
 - **Service layer** encapsulates all Firebase and API interactions — screens never call Firestore directly
 - **Custom hooks** provide reactive data fetching with real-time listeners, pagination, and loading states
 - **File-based routing** via Expo Router with auth-guarded route groups
-- **Separated styles** keep component files focused on logic, not layout
+- **Platform-specific files** (`.web.tsx`) handle web-only UI fallbacks while sharing the core codebase with mobile
 - **Centralized types** in a dedicated `types/` directory for full type safety across the codebase
+- **Deployed Firestore security rules** enforce authenticated access and ownership constraints in production
 
 > See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full technical deep-dive including data models, data flow diagrams, and scaling plan.
 
@@ -80,7 +87,7 @@ The app follows a **layered architecture** that cleanly separates concerns:
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Framework** | React Native + Expo SDK 54 | Cross-platform iOS & Android |
+| **Framework** | React Native + Expo SDK 54 | Cross-platform iOS, Android & Web |
 | **Routing** | Expo Router | Type-safe file-based navigation |
 | **Language** | TypeScript 5.9 | Static typing across the entire codebase |
 | **Database** | Cloud Firestore | Real-time NoSQL with snapshot listeners |
@@ -90,6 +97,7 @@ The app follows a **layered architecture** that cleanly separates concerns:
 | **Places** | Google Places API | Autocomplete search and place details |
 | **Location** | expo-location | Device GPS for nearby discovery |
 | **Images** | expo-image-picker | Camera and gallery integration |
+| **Hosting** | Vercel | Free web deployment with SPA routing |
 | **Build** | EAS Build | Cloud-based native builds for iOS & Android |
 
 ---
@@ -144,6 +152,9 @@ npx expo start --ios
 
 # Run on Android emulator
 npx expo start --android
+
+# Run on web
+npx expo start --web
 ```
 
 ---
@@ -158,13 +169,18 @@ groupeats/
 │   │   ├── login.tsx
 │   │   └── signup.tsx
 │   ├── (protected)/              # Auth-guarded screens
+│   │   ├── _layout.tsx           # Protected stack navigator
+│   │   ├── index.tsx             # Home screen with feature cards
 │   │   ├── feed.tsx              # Social review feed
 │   │   ├── explore.tsx           # Interactive map view
+│   │   ├── explore.web.tsx       # Web: list-based place browser
 │   │   ├── new-post.tsx          # Create a review
+│   │   ├── new-post.web.tsx      # Web: manual place entry
 │   │   ├── place-detail.tsx      # Restaurant detail + reviews
-│   │   └── dining-hall.tsx       # Dining hall events
+│   │   ├── dining-hall.tsx       # Dining hall events (shared)
+│   │   └── friends.tsx           # Friends management screen
 │   └── context/
-│       └── AuthContext.tsx        # Global auth state provider
+│       └── AuthContext.tsx        # Global auth state + auto profile creation
 │
 ├── components/                   # Reusable UI components
 │   ├── common/                   # Button, Input
@@ -186,16 +202,22 @@ groupeats/
 │
 ├── types/                        # TypeScript type definitions
 │   ├── Post.ts
-│   ├── User.ts
+│   ├── User.ts                   # UserProfile, AuthContextType
 │   ├── Place.ts
-│   ├── DiningHall.ts
+│   ├── DiningHall.ts             # DiningHallEvent, TimeChangeRequest
 │   └── index.ts                  # Barrel exports
+│
+├── shims/                        # Web platform shims
+│   └── react-native-maps.js     # Dummy module for web builds
 │
 ├── styles/                       # Separated StyleSheet files
 ├── constants/                    # Theme & color tokens
 ├── utils/                        # Validation & formatting helpers
 ├── assets/                       # Fonts & images
-├── firebaseConfig.ts             # Firebase initialization
+├── firebaseConfig.ts             # Firebase initialization (env-based)
+├── firestore.rules               # Deployed Firestore security rules
+├── metro.config.js               # Metro bundler config (web shims)
+├── vercel.json                   # Vercel deployment config
 └── app.json                      # Expo configuration
 ```
 
@@ -211,7 +233,7 @@ groupeats/
   userId: string
   userName: string
   userProfilePic: string
-  placeId: string          // Google Place ID
+  placeId: string
   placeName: string
   placeAddress: string
   description: string
@@ -231,7 +253,7 @@ groupeats/
   name: string
   email: string
   profilePic: string
-  friends: string[]        // UIDs of connected friends
+  friends: string[]        // UIDs — mutual add/remove
   createdAt: string
 }
 ```
@@ -241,13 +263,27 @@ groupeats/
 ```typescript
 {
   id: string
-  userId: string
-  userName: string
-  diningHall: string
-  minutesUntilArrival: number
+  creatorId: string
+  creatorName: string
+  targetTime: string         // ISO timestamp countdown target
+  customMinutes: number      // Original minutes chosen
+  participants: string[]     // UIDs of everyone going
+  status: 'active' | 'completed' | 'cancelled'
+  extendRequests: TimeChangeRequest[]
   createdAt: string
-  expiresAt: string
-  participants: string[]
+  notificationsSent: string[]
+}
+```
+
+### TimeChangeRequest (embedded in events)
+
+```typescript
+{
+  requesterId: string
+  minutes: number
+  type: 'extend' | 'prepone'    // Push later or pull sooner
+  status: 'pending' | 'approved' | 'denied'
+  createdAt: string
 }
 ```
 
@@ -263,10 +299,14 @@ groupeats/
 - [x] Interactive map with place markers
 - [x] Google Places search & autocomplete
 - [x] Place detail with aggregated reviews
-- [x] Dining hall events with countdown
+- [x] Dining hall events with countdown timers
+- [x] Join / leave dining hall events
+- [x] Extend & prepone time-change requests with owner approval
+- [x] Friends management (search, add, remove)
 - [x] Service layer architecture
+- [x] Firestore security rules
+- [x] Web deployment (Vercel)
 - [ ] Comments on reviews
-- [ ] Friend request system & management UI
 - [ ] Push notifications (FCM)
 - [ ] Saved places / collections
 - [ ] Offline sync support
@@ -285,10 +325,12 @@ A live web build is available at **[groupeats-rho.vercel.app](https://groupeats-
 > |---|---|
 > | Interactive Map (Explore) | Replaced with a list-based place browser — `react-native-maps` is native-only |
 > | Camera capture | Not available — gallery upload still works |
-> | Google Places Autocomplete | Uses text search fallback instead of the native autocomplete widget |
+> | Google Places Autocomplete | Manual text entry for place name and address (avoids CORS) |
 > | Push notifications | Not wired on any platform yet |
 >
-> For the full experience, build and run the app on iOS or Android using `npx expo start`.
+> All other features — **feed, friends, dining hall events, join/leave, extend/prepone** — work identically on web and mobile.
+>
+> For the full native experience, build and run the app on iOS or Android using `npx expo start`.
 
 ---
 
