@@ -19,7 +19,7 @@
 
 ## Overview
 
-**GroupEats** is a full-stack mobile + web application built with React Native and Firebase that turns dining into a social experience. Users can discover nearby restaurants on an interactive map, post photo reviews with star ratings, manage a friends list, coordinate dining hall trips with real-time countdowns, and negotiate timing through an extend/prepone approval system — all in real time.
+**GroupEats** is an open-source, full-stack mobile + web application built with React Native and Firebase that turns dining into a social experience. Users can discover nearby restaurants on an interactive map, post photo reviews with star ratings, manage a friends list, coordinate dining hall trips with real-time countdowns, and negotiate timing through an extend/prepone approval system — all in real time.
 
 The app is built with a clean layered architecture, a dedicated service layer for all business logic, real-time Firestore subscriptions, and deployed Firestore security rules — demonstrating production-level patterns for mobile and web development.
 
