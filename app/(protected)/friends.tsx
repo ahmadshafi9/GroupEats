@@ -14,9 +14,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { UserProfileService } from '../../services/auth/userProfileService';
 import { UserProfile } from '../../types/User';
+import type { FriendRequest } from '../../types/User';
 import { Theme } from '../../constants/theme';
 
-type Tab = 'friends' | 'find';
+type Tab = 'friends' | 'requests' | 'find';
 
 export default function Friends() {
   const { user, userProfile, refreshProfile } = useAuth();
@@ -24,6 +25,9 @@ export default function Friends() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
+  const [requestSenderNames, setRequestSenderNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -31,12 +35,22 @@ export default function Friends() {
   const loadData = useCallback(async () => {
     if (!user?.uid || !userProfile) return;
     try {
-      const [users, friends] = await Promise.all([
+      const [users, friends, incoming, outgoing] = await Promise.all([
         UserProfileService.getAllUsers(),
         UserProfileService.getUserProfiles(userProfile.friends || []),
+        UserProfileService.getIncomingFriendRequests(user.uid),
+        UserProfileService.getOutgoingFriendRequests(user.uid),
       ]);
       setAllUsers(users.filter((u) => u.uid !== user.uid));
       setFriendProfiles(friends);
+      setIncomingRequests(incoming);
+      setOutgoingRequests(outgoing);
+      if (incoming.length > 0) {
+        const names = await UserProfileService.getUserProfiles(incoming.map((r) => r.fromUserId));
+        const map: Record<string, string> = {};
+        names.forEach((p) => { map[p.uid] = p.name; });
+        setRequestSenderNames(map);
+      }
     } catch (error) {
       console.error('Error loading friends data:', error);
     } finally {
@@ -53,14 +67,39 @@ export default function Friends() {
   };
 
   const isFriend = (uid: string) => userProfile?.friends?.includes(uid) ?? false;
+  const hasOutgoingRequestTo = (uid: string) => outgoingRequests.some((r) => r.toUserId === uid);
+  const incomingFrom = (uid: string) => incomingRequests.find((r) => r.fromUserId === uid);
 
-  const handleAddFriend = async (friendId: string) => {
+  const handleSendRequest = async (toUserId: string) => {
     if (!user?.uid) return;
-    setActionLoading(friendId);
+    setActionLoading(toUserId);
     try {
-      await UserProfileService.addFriend(user.uid, friendId);
-      await UserProfileService.addFriend(friendId, user.uid);
+      await UserProfileService.sendFriendRequest(user.uid, toUserId);
+      await loadData();
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      await UserProfileService.acceptFriendRequest(requestId);
       await refreshProfile();
+      await loadData();
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeclineRequest = async (requestId: string) => {
+    setActionLoading(requestId);
+    try {
+      await UserProfileService.declineFriendRequest(requestId);
       await loadData();
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -125,6 +164,8 @@ export default function Friends() {
   const renderUserCard = (profile: UserProfile, showRemove: boolean) => {
     const isLoading = actionLoading === profile.uid;
     const alreadyFriend = isFriend(profile.uid);
+    const requested = hasOutgoingRequestTo(profile.uid);
+    const receivedRequest = incomingFrom(profile.uid);
 
     return (
       <View key={profile.uid} style={styles.userCard}>
@@ -146,13 +187,66 @@ export default function Friends() {
           <View style={styles.friendsBadge}>
             <Text style={styles.friendsBadgeText}>Friends</Text>
           </View>
+        ) : receivedRequest ? (
+          <View style={styles.requestActions}>
+            <TouchableOpacity
+              style={styles.acceptButton}
+              onPress={() => handleAcceptRequest(receivedRequest.id)}
+            >
+              <Text style={styles.acceptButtonText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.declineButton}
+              onPress={() => handleDeclineRequest(receivedRequest.id)}
+            >
+              <Text style={styles.declineButtonText}>Decline</Text>
+            </TouchableOpacity>
+          </View>
+        ) : requested ? (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingBadgeText}>Requested</Text>
+          </View>
         ) : (
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => handleAddFriend(profile.uid)}
+            onPress={() => handleSendRequest(profile.uid)}
           >
             <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  const renderIncomingRequestRow = (req: FriendRequest) => {
+    const name = requestSenderNames[req.fromUserId] || 'Someone';
+    const isLoading = actionLoading === req.id;
+    return (
+      <View key={req.id} style={styles.userCard}>
+        <View style={styles.avatarPlaceholder}>
+          <Text style={styles.avatarText}>{name.slice(0, 2).toUpperCase()}</Text>
+        </View>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{name}</Text>
+          <Text style={styles.userEmail}>Wants to be your friend</Text>
+        </View>
+        {isLoading ? (
+          <ActivityIndicator size="small" color={Theme.colors.primary} />
+        ) : (
+          <View style={styles.requestActions}>
+            <TouchableOpacity
+              style={styles.acceptButton}
+              onPress={() => handleAcceptRequest(req.id)}
+            >
+              <Text style={styles.acceptButtonText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.declineButton}
+              onPress={() => handleDeclineRequest(req.id)}
+            >
+              <Text style={styles.declineButtonText}>Decline</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
@@ -166,6 +260,8 @@ export default function Friends() {
     );
   }
 
+  const requestCount = incomingRequests.length;
+
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
@@ -175,6 +271,14 @@ export default function Friends() {
         >
           <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>
             My Friends ({friendProfiles.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'requests' && styles.tabActive]}
+          onPress={() => setTab('requests')}
+        >
+          <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>
+            Requests {requestCount > 0 ? `(${requestCount})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -215,17 +319,26 @@ export default function Friends() {
               <Text style={styles.emptyIcon}>👥</Text>
               <Text style={styles.emptyTitle}>No friends yet</Text>
               <Text style={styles.emptySubtitle}>
-                Switch to "Find People" to add friends
+                Go to Find People to send friend requests, or check Requests to accept pending ones.
               </Text>
-              <TouchableOpacity
-                style={styles.findButton}
-                onPress={() => setTab('find')}
-              >
+              <TouchableOpacity style={styles.findButton} onPress={() => setTab('find')}>
                 <Text style={styles.findButtonText}>Find People</Text>
               </TouchableOpacity>
             </View>
           ) : (
             friendProfiles.map((p) => renderUserCard(p, true))
+          )
+        ) : tab === 'requests' ? (
+          incomingRequests.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📬</Text>
+              <Text style={styles.emptyTitle}>No pending requests</Text>
+              <Text style={styles.emptySubtitle}>
+                When someone sends you a friend request, it will show up here.
+              </Text>
+            </View>
+          ) : (
+            incomingRequests.map(renderIncomingRequestRow)
           )
         ) : filteredUsers.length === 0 ? (
           <View style={styles.emptyState}>
@@ -254,14 +367,14 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     borderBottomWidth: 3,
     borderBottomColor: 'transparent',
   },
   tabActive: { borderBottomColor: Theme.colors.primary },
   tabText: {
-    fontSize: Theme.fontSize.md,
+    fontSize: 13,
     fontWeight: Theme.fontWeight.medium,
     color: Theme.colors.textSecondary,
   },
@@ -317,6 +430,30 @@ const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.round,
   },
   addButtonText: { color: '#fff', fontWeight: Theme.fontWeight.semibold, fontSize: 14 },
+  requestActions: { flexDirection: 'row', gap: 8 },
+  acceptButton: {
+    backgroundColor: Theme.colors.success,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Theme.borderRadius.round,
+  },
+  acceptButtonText: { color: '#fff', fontWeight: Theme.fontWeight.semibold, fontSize: 13 },
+  declineButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: Theme.colors.danger,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Theme.borderRadius.round,
+  },
+  declineButtonText: { color: Theme.colors.danger, fontWeight: Theme.fontWeight.semibold, fontSize: 13 },
+  pendingBadge: {
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Theme.borderRadius.round,
+  },
+  pendingBadgeText: { color: '#e65100', fontWeight: Theme.fontWeight.semibold, fontSize: 13 },
   removeButton: {
     backgroundColor: '#fff',
     borderWidth: 1,

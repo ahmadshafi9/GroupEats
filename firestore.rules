@@ -19,5 +19,14 @@ service cloud.firestore {
       allow read: if request.auth != null && resource.data.recipientId == request.auth.uid;
       allow create: if request.auth != null;
     }
+    match /friendRequests/{requestId} {
+      allow read: if request.auth != null
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+      allow update: if request.auth != null
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+      allow delete: if request.auth != null
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+    }
   }
 }

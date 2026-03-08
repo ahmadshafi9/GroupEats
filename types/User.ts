@@ -8,6 +8,16 @@ export type UserProfile = {
   createdAt: string;
 };
 
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined';
+
+export type FriendRequest = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: FriendRequestStatus;
+  createdAt: string;
+};
+
 export type AuthContextType = {
   isLoggedIn: boolean;
   user: import('firebase/auth').User | null;
