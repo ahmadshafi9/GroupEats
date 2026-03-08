@@ -23,15 +23,41 @@ This project uses **GitHub Actions** to build, test, and deploy on every push an
 
 ## Required GitHub secrets
 
-Add these in **GitHub → repo → Settings → Secrets and variables → Actions**.
+Add these in **GitHub → repo → Settings → Secrets and variables → Actions** → **Repository secrets** → **New repository secret**.
 
-### For deploy to work
+Use **Repository secrets** (not Environment secrets).
+
+### Copy-paste checklist
+
+Use this as a checklist. For each row: create a **New repository secret**, set **Name** to the left value, set **Secret** to the value you get from the right.
+
+```
+Name: VERCEL_TOKEN
+Secret: <paste from https://vercel.com/account/tokens — Create Token, then copy>
+
+Name: VERCEL_ORG_ID
+Secret: <paste orgId from .vercel/project.json after running vercel link in project folder>
+
+Name: VERCEL_PROJECT_ID
+Secret: <paste projectId from .vercel/project.json>
+```
+
+**Quick way to get org + project ID:** In project folder run `vercel link` (if not already linked), then:
+
+```bash
+cat .vercel/project.json
+```
+
+Copy `orgId` → **VERCEL_ORG_ID** secret.  
+Copy `projectId` → **VERCEL_PROJECT_ID** secret.
+
+### Reference
 
 | Secret               | Where to get it |
 |----------------------|------------------|
 | `VERCEL_TOKEN`       | [Vercel Account → Tokens](https://vercel.com/account/tokens): create a token with full scope. |
-| `VERCEL_ORG_ID`      | In your project folder run `vercel link`, then open `.vercel/project.json` and copy `orgId`. Or: Vercel dashboard → Project Settings → General. |
-| `VERCEL_PROJECT_ID`  | Same `.vercel/project.json`, copy `projectId`. Or: Vercel dashboard → Project Settings → General. |
+| `VERCEL_ORG_ID`      | `.vercel/project.json` → `orgId`. Or: Vercel dashboard → Project Settings → General. |
+| `VERCEL_PROJECT_ID`  | `.vercel/project.json` → `projectId`. Or: Vercel dashboard → Project Settings → General. |
 
 ### Optional (for CI build to use real env)
 
