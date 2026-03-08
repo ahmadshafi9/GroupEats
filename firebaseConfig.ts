@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from 'firebase/firestore';
-import { initializeAuth, getReactNativePersistence, browserLocalPersistence } from "firebase/auth";
+import { initializeAuth, browserLocalPersistence } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
@@ -22,10 +22,16 @@ function initAuth() {
   if (Platform.OS === "web") {
     return initializeAuth(app, { persistence: browserLocalPersistence });
   }
-  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-  return initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
+  try {
+    // Firebase 12: React Native persistence may be in a separate path; avoid top-level import for web build.
+    const { getReactNativePersistence } = require("firebase/auth/react-native");
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    return initializeAuth(app, {});
+  }
 }
 
 export const auth = initAuth();
