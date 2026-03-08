@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-▶_Try_It-00C853?style=flat&logo=vercel&logoColor=white)](https://groupeats-rho.vercel.app)
 
-[Live Demo](https://groupeats-rho.vercel.app) · [Features](#features) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Getting Started](#getting-started) · [Project Structure](#project-structure)
+[Live Demo](https://groupeats-rho.vercel.app) · [Features](#features) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Getting Started](#getting-started) · [Project Structure](#project-structure) · [CI/CD](docs/CI-CD.md)
 
 </div>
 

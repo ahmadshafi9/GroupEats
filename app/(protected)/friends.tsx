@@ -35,14 +35,23 @@ export default function Friends() {
   const loadData = useCallback(async () => {
     if (!user?.uid || !userProfile) return;
     try {
-      const [users, friends, incoming, outgoing] = await Promise.all([
+      const [users, friends] = await Promise.all([
         UserProfileService.getAllUsers(),
         UserProfileService.getUserProfiles(userProfile.friends || []),
-        UserProfileService.getIncomingFriendRequests(user.uid),
-        UserProfileService.getOutgoingFriendRequests(user.uid),
       ]);
       setAllUsers(users.filter((u) => u.uid !== user.uid));
       setFriendProfiles(friends);
+    } catch (error) {
+      console.error('Error loading users/friends:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+    try {
+      const [incoming, outgoing] = await Promise.all([
+        UserProfileService.getIncomingFriendRequests(user.uid),
+        UserProfileService.getOutgoingFriendRequests(user.uid),
+      ]);
       setIncomingRequests(incoming);
       setOutgoingRequests(outgoing);
       if (incoming.length > 0) {
@@ -52,10 +61,9 @@ export default function Friends() {
         setRequestSenderNames(map);
       }
     } catch (error) {
-      console.error('Error loading friends data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      console.error('Error loading friend requests:', error);
+      setIncomingRequests([]);
+      setOutgoingRequests([]);
     }
   }, [user?.uid, userProfile?.friends?.length]);
 
