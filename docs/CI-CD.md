@@ -65,6 +65,17 @@ If you want the **CI build** step to use your real Firebase/Maps config (e.g. fo
 
 You should already have **Environment Variables** set in the **Vercel** project (Dashboard → Project → Settings → Environment Variables) so that Vercel’s build uses the real keys when deploying.
 
+## Troubleshooting: "Input required and not supplied: vercel-token"
+
+This error means the deploy step did not receive the token. **GitHub secret names are case-sensitive.**
+
+- The workflow expects **Repository secrets** named **exactly**:
+  - `VERCEL_TOKEN` (all caps, underscore — **not** `vercel-token` or `vercel_token`)
+  - `VERCEL_ORG_ID`
+  - `VERCEL_PROJECT_ID`
+- Go to **Settings → Secrets and variables → Actions** and confirm you have three **Repository secrets** with those exact names (no extra spaces, correct spelling).
+- If you added a secret named `vercel-token` (lowercase with hyphen), GitHub doesn't let you rename secrets — add a new secret with name `VERCEL_TOKEN` and paste the same token value, then delete the old one if you like.
+
 ## Local commands
 
 ```bash
