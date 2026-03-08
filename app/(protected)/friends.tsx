@@ -269,6 +269,11 @@ export default function Friends() {
   }
 
   const requestCount = incomingRequests.length;
+  const friendCount = userProfile?.friends?.length ?? 0;
+  const friendListForDisplay: UserProfile[] = (userProfile?.friends || []).map((uid) => {
+    const p = friendProfiles.find((f) => f.uid === uid);
+    return p ?? { uid, name: 'Unknown user', email: '', profilePic: '', friends: [], createdAt: '' };
+  });
 
   return (
     <View style={styles.container}>
@@ -278,7 +283,7 @@ export default function Friends() {
           onPress={() => setTab('friends')}
         >
           <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>
-            My Friends ({friendProfiles.length})
+            My Friends ({friendCount})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -322,7 +327,7 @@ export default function Friends() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {tab === 'friends' ? (
-          friendProfiles.length === 0 ? (
+          friendCount === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>👥</Text>
               <Text style={styles.emptyTitle}>No friends yet</Text>
@@ -334,7 +339,7 @@ export default function Friends() {
               </TouchableOpacity>
             </View>
           ) : (
-            friendProfiles.map((p) => renderUserCard(p, true))
+            friendListForDisplay.map((p) => renderUserCard(p, true))
           )
         ) : tab === 'requests' ? (
           incomingRequests.length === 0 ? (
