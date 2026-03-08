@@ -47,4 +47,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+# Vercel (optional; link from CLI adds .vercel)
 .vercel
+
+# Nested repo / old copy (do not track)
+groupeats/
