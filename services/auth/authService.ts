@@ -11,6 +11,18 @@ import { auth } from '../../firebaseConfig';
  * Handles all authentication-related operations
  */
 export class AuthService {
+  private static formatAuthError(error: unknown, fallback: string) {
+    const anyErr = error as any;
+    const code = typeof anyErr?.code === 'string' ? anyErr.code : '';
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof anyErr?.message === 'string'
+          ? anyErr.message
+          : fallback;
+    return code ? `${message} (${code})` : message;
+  }
+
   /**
    * Sign in with email and password
    */
@@ -19,9 +31,7 @@ export class AuthService {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential.user;
     } catch (error) {
-      throw new Error(
-        error instanceof Error ? error.message : 'Failed to sign in'
-      );
+      throw new Error(this.formatAuthError(error, 'Failed to sign in'));
     }
   }
 
@@ -37,9 +47,7 @@ export class AuthService {
       );
       return userCredential.user;
     } catch (error) {
-      throw new Error(
-        error instanceof Error ? error.message : 'Failed to create account'
-      );
+      throw new Error(this.formatAuthError(error, 'Failed to create account'));
     }
   }
 

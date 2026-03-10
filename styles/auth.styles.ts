@@ -54,5 +54,11 @@ export const authStyles = StyleSheet.create({
     fontSize: Theme.fontSize.md,
     fontWeight: Theme.fontWeight.semibold,
   },
+  debugText: {
+    marginTop: Theme.spacing.xl,
+    textAlign: 'center',
+    fontSize: Theme.fontSize.xs,
+    color: Theme.colors.textTertiary,
+  },
 });
 

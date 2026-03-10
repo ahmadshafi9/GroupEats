@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { AuthService } from '../../services/auth/authService';
 import { UserProfileService } from '../../services/auth/userProfileService';
@@ -12,19 +12,27 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const showError = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
   const handleSignUp = async () => {
     if (!Validation.isRequired(name) || !Validation.isRequired(email) || !Validation.isRequired(password)) {
-      Alert.alert('Error', 'Please enter all fields');
+      showError('Error', 'Please enter all fields');
       return;
     }
 
     if (!Validation.isValidEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      showError('Error', 'Please enter a valid email address');
       return;
     }
 
     if (!Validation.isValidPassword(password)) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showError('Error', 'Password must be at least 6 characters');
       return;
     }
 
@@ -40,9 +48,9 @@ export default function SignupScreen() {
         createdAt: new Date().toISOString(),
       });
       
-      Alert.alert('Success', 'Account created!');
+      showError('Success', 'Account created!');
     } catch (error: any) {
-      Alert.alert('Sign up failed', error.message);
+      showError('Sign up failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -94,6 +102,9 @@ export default function SignupScreen() {
           <Text style={authStyles.secondaryButtonText}>Already have an account? Log In</Text>
         </TouchableOpacity>
       </View>
+      <Text style={authStyles.debugText}>
+        Firebase: {process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'missing'} · {process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'missing'}
+      </Text>
     </View>
   );
 }
