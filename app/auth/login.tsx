@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { AuthService } from '../../services/auth/authService';
 import { Validation } from '../../utils/validation';
@@ -10,22 +10,14 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const showError = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${title}: ${message}`);
-      return;
-    }
-    Alert.alert(title, message);
-  };
-
   const handleLogin = async () => {
     if (!Validation.isRequired(email) || !Validation.isRequired(password)) {
-      showError('Error', 'Please enter email and password');
+      Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
     if (!Validation.isValidEmail(email)) {
-      showError('Error', 'Please enter a valid email address');
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -33,7 +25,7 @@ export default function LoginScreen() {
     try {
       await AuthService.signIn(email, password);
     } catch (error) {
-      showError('Login Failed', error instanceof Error ? error.message : String(error));
+      Alert.alert('Login Failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -74,9 +66,6 @@ export default function LoginScreen() {
           <Text style={authStyles.secondaryButtonText}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
       </View>
-      <Text style={authStyles.debugText}>
-        Firebase: {process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'missing'} · {process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'missing'}
-      </Text>
     </View>
   );
 }
