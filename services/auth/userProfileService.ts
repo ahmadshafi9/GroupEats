@@ -37,9 +37,14 @@ export class UserProfileService {
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
+        const data = userDoc.data();
         return {
           uid: userDoc.id,
-          ...userDoc.data(),
+          name: data?.name ?? '',
+          email: data?.email ?? '',
+          profilePic: data?.profilePic ?? '',
+          friends: Array.isArray(data?.friends) ? data.friends : [],
+          createdAt: data?.createdAt ?? new Date().toISOString(),
         } as UserProfile;
       }
 
@@ -102,7 +107,17 @@ export class UserProfileService {
   static async getAllUsers(): Promise<UserProfile[]> {
     try {
       const snapshot = await getDocs(collection(db, 'users'));
-      return snapshot.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile));
+      return snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          name: data?.name ?? '',
+          email: data?.email ?? '',
+          profilePic: data?.profilePic ?? '',
+          friends: Array.isArray(data?.friends) ? data.friends : [],
+          createdAt: data?.createdAt ?? new Date().toISOString(),
+        } as UserProfile;
+      });
     } catch (error) {
       throw new Error(
         error instanceof Error ? error.message : 'Failed to fetch users'

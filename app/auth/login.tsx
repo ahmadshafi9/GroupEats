@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { AuthService } from '../../services/auth/authService';
 import { Validation } from '../../utils/validation';
@@ -24,7 +24,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await AuthService.signIn(email, password);
-      // NO manual navigation needed - Stack.Protected handles it!
     } catch (error) {
       Alert.alert('Login Failed', error instanceof Error ? error.message : String(error));
     } finally {
@@ -50,11 +49,23 @@ export default function LoginScreen() {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Sign In" onPress={handleLogin} disabled={loading} />
-      <Button 
-        title="Don't have an account? Sign Up" 
-        onPress={() => router.push('/auth/signup')}
-      />
+      <View style={authStyles.buttonRow}>
+        <TouchableOpacity
+          style={[authStyles.primaryButton, loading && authStyles.primaryButtonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={authStyles.primaryButtonText}>{loading ? 'Signing In...' : 'Sign In'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={authStyles.secondaryButton}
+          onPress={() => router.push('/auth/signup')}
+          activeOpacity={0.8}
+        >
+          <Text style={authStyles.secondaryButtonText}>Don't have an account? Sign Up</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

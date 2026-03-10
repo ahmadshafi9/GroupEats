@@ -68,7 +68,7 @@ export default function ProtectedHome() {
           <View>
             <Text style={styles.friendsTitle}>Friends</Text>
             <Text style={styles.friendsSubtitle}>
-              {userProfile?.friends?.length || 0} friends · Find &amp; add people
+              {Array.isArray(userProfile?.friends) ? userProfile.friends.length : 0} friends · Find &amp; add people
             </Text>
           </View>
         </TouchableOpacity>

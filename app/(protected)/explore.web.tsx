@@ -45,9 +45,8 @@ export default function ExploreWeb() {
     : places;
 
   const hasFriendReviews = (place: PlaceWithReviews) => {
-    return place.posts.some((post) =>
-      userProfile?.friends.includes(post.userId)
-    );
+    const friends = Array.isArray(userProfile?.friends) ? userProfile.friends : [];
+    return place.posts.some((post) => friends.includes(post.userId));
   };
 
   if (loading) {

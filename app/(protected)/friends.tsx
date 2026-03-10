@@ -10,6 +10,7 @@ import {
   Image,
   StyleSheet,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { UserProfileService } from '../../services/auth/userProfileService';
@@ -19,6 +20,14 @@ import { Theme } from '../../constants/theme';
 
 type Tab = 'friends' | 'requests' | 'find';
 
+function showError(title: string, msg: string) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${msg}`);
+  } else {
+    Alert.alert(title, msg);
+  }
+}
+
 export default function Friends() {
   const { user, userProfile, refreshProfile } = useAuth();
   const [tab, setTab] = useState<Tab>('friends');
@@ -27,22 +36,34 @@ export default function Friends() {
   const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
+  const [sentToUids, setSentToUids] = useState<Set<string>>(new Set());
   const [requestSenderNames, setRequestSenderNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user?.uid || !userProfile) return;
+    setLoadError(null);
     try {
+      const friendIds = Array.isArray(userProfile.friends) ? userProfile.friends : [];
       const [users, friends] = await Promise.all([
-        UserProfileService.getAllUsers(),
-        UserProfileService.getUserProfiles(userProfile.friends || []),
+        UserProfileService.getAllUsers().catch((e) => {
+          console.error('getAllUsers failed:', e);
+          setLoadError((prev) => (prev ? `${prev}; ` : '') + (e instanceof Error ? e.message : 'Could not load user list'));
+          return [] as UserProfile[];
+        }),
+        friendIds.length > 0
+          ? UserProfileService.getUserProfiles(friendIds).catch((e) => {
+              console.error('getUserProfiles failed:', e);
+              setLoadError((prev) => (prev ? `${prev}; ` : '') + (e instanceof Error ? e.message : 'Could not load friends'));
+              return [] as UserProfile[];
+            })
+          : Promise.resolve([] as UserProfile[]),
       ]);
       setAllUsers(users.filter((u) => u.uid !== user.uid));
       setFriendProfiles(friends);
-    } catch (error) {
-      console.error('Error loading users/friends:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -54,6 +75,12 @@ export default function Friends() {
       ]);
       setIncomingRequests(incoming);
       setOutgoingRequests(outgoing);
+      const alreadySent = new Set(outgoing.map((r) => r.toUserId));
+      setSentToUids((prev) => {
+        const merged = new Set(prev);
+        alreadySent.forEach((uid) => merged.add(uid));
+        return merged;
+      });
       if (incoming.length > 0) {
         const names = await UserProfileService.getUserProfiles(incoming.map((r) => r.fromUserId));
         const map: Record<string, string> = {};
@@ -62,8 +89,6 @@ export default function Friends() {
       }
     } catch (error) {
       console.error('Error loading friend requests:', error);
-      setIncomingRequests([]);
-      setOutgoingRequests([]);
     }
   }, [user?.uid, userProfile?.friends?.length]);
 
@@ -74,31 +99,44 @@ export default function Friends() {
     loadData();
   };
 
-  const isFriend = (uid: string) => userProfile?.friends?.includes(uid) ?? false;
-  const hasOutgoingRequestTo = (uid: string) => outgoingRequests.some((r) => r.toUserId === uid);
+  const isFriend = (uid: string) => (Array.isArray(userProfile?.friends) ? userProfile.friends : []).includes(uid);
+  const hasOutgoingRequestTo = (uid: string) =>
+    sentToUids.has(uid) || outgoingRequests.some((r) => r.toUserId === uid);
   const incomingFrom = (uid: string) => incomingRequests.find((r) => r.fromUserId === uid);
 
   const handleSendRequest = async (toUserId: string) => {
     if (!user?.uid) return;
     setActionLoading(toUserId);
+
+    setSentToUids((prev) => new Set(prev).add(toUserId));
+
     try {
       await UserProfileService.sendFriendRequest(user.uid, toUserId);
-      await loadData();
+      loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      setSentToUids((prev) => {
+        const next = new Set(prev);
+        next.delete(toUserId);
+        return next;
+      });
+      showError('Error', error.message || 'Failed to send request');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleAcceptRequest = async (requestId: string) => {
+  const handleAcceptRequest = async (requestId: string, fromUserId: string) => {
     setActionLoading(requestId);
+
+    setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
     try {
       await UserProfileService.acceptFriendRequest(requestId);
       await refreshProfile();
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showError('Error', error.message || 'Failed to accept request');
+      await loadData();
     } finally {
       setActionLoading(null);
     }
@@ -106,11 +144,15 @@ export default function Friends() {
 
   const handleDeclineRequest = async (requestId: string) => {
     setActionLoading(requestId);
+
+    setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
     try {
       await UserProfileService.declineFriendRequest(requestId);
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showError('Error', error.message || 'Failed to decline request');
+      await loadData();
     } finally {
       setActionLoading(null);
     }
@@ -118,30 +160,28 @@ export default function Friends() {
 
   const handleRemoveFriend = async (friendId: string) => {
     if (!user?.uid) return;
-    Alert.alert(
-      'Remove Friend',
-      'Are you sure you want to remove this friend?',
-      [
+    const doRemove = async () => {
+      setActionLoading(friendId);
+      try {
+        await UserProfileService.removeFriend(user.uid, friendId);
+        await UserProfileService.removeFriend(friendId, user.uid);
+        await refreshProfile();
+        await loadData();
+      } catch (error: any) {
+        showError('Error', error.message || 'Failed to remove friend');
+      } finally {
+        setActionLoading(null);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove this friend?')) doRemove();
+    } else {
+      Alert.alert('Remove Friend', 'Are you sure you want to remove this friend?', [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(friendId);
-            try {
-              await UserProfileService.removeFriend(user.uid, friendId);
-              await UserProfileService.removeFriend(friendId, user.uid);
-              await refreshProfile();
-              await loadData();
-            } catch (error: any) {
-              Alert.alert('Error', error.message);
-            } finally {
-              setActionLoading(null);
-            }
-          },
-        },
-      ]
-    );
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]);
+    }
   };
 
   const filteredUsers = searchQuery.trim()
@@ -199,7 +239,7 @@ export default function Friends() {
           <View style={styles.requestActions}>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() => handleAcceptRequest(receivedRequest.id)}
+              onPress={() => handleAcceptRequest(receivedRequest.id, receivedRequest.fromUserId)}
             >
               <Text style={styles.acceptButtonText}>Accept</Text>
             </TouchableOpacity>
@@ -244,7 +284,7 @@ export default function Friends() {
           <View style={styles.requestActions}>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() => handleAcceptRequest(req.id)}
+              onPress={() => handleAcceptRequest(req.id, req.fromUserId)}
             >
               <Text style={styles.acceptButtonText}>Accept</Text>
             </TouchableOpacity>
@@ -269,14 +309,20 @@ export default function Friends() {
   }
 
   const requestCount = incomingRequests.length;
-  const friendCount = userProfile?.friends?.length ?? 0;
-  const friendListForDisplay: UserProfile[] = (userProfile?.friends || []).map((uid) => {
+  const friendIds = Array.isArray(userProfile?.friends) ? userProfile.friends : [];
+  const friendCount = friendIds.length;
+  const friendListForDisplay: UserProfile[] = friendIds.map((uid) => {
     const p = friendProfiles.find((f) => f.uid === uid);
     return p ?? { uid, name: 'Unknown user', email: '', profilePic: '', friends: [], createdAt: '' };
   });
 
   return (
     <View style={styles.container}>
+      {loadError ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{loadError}</Text>
+        </View>
+      ) : null}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, tab === 'friends' && styles.tabActive]}
@@ -372,6 +418,14 @@ export default function Friends() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Theme.colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorBanner: {
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffcc80',
+  },
+  errorBannerText: { fontSize: 14, color: '#e65100', fontWeight: Theme.fontWeight.medium },
   tabs: {
     flexDirection: 'row',
     backgroundColor: Theme.colors.surface,

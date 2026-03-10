@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { AuthService } from '../../services/auth/authService';
 import { UserProfileService } from '../../services/auth/userProfileService';
@@ -41,7 +41,6 @@ export default function SignupScreen() {
       });
       
       Alert.alert('Success', 'Account created!');
-      // Don't navigate - let AuthContext handle it automatically
     } catch (error: any) {
       Alert.alert('Sign up failed', error.message);
     } finally {
@@ -78,12 +77,23 @@ export default function SignupScreen() {
         secureTextEntry
       />
       
-      <Button title={loading ? "Creating..." : "Sign Up"} onPress={handleSignUp} disabled={loading} />
-      
-      <Button 
-        title="Already have an account? Log In" 
-        onPress={() => router.push('/auth/login')}
-      />
+      <View style={authStyles.buttonRow}>
+        <TouchableOpacity
+          style={[authStyles.primaryButton, loading && authStyles.primaryButtonDisabled]}
+          onPress={handleSignUp}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={authStyles.primaryButtonText}>{loading ? 'Creating...' : 'Sign Up'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={authStyles.secondaryButton}
+          onPress={() => router.push('/auth/login')}
+          activeOpacity={0.8}
+        >
+          <Text style={authStyles.secondaryButtonText}>Already have an account? Log In</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

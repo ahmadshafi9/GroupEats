@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -23,6 +23,7 @@ import { newPostStyles } from '../../styles/newPost.styles';
 
 export default function NewPost() {
   const { user, userProfile } = useAuth();
+  const submittingRef = useRef(false);
   
   // Selected place from Google
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
@@ -111,6 +112,8 @@ export default function NewPost() {
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
+
     if (!selectedPlace && !placeName.trim()) {
       Alert.alert('Error', 'Please enter a place name');
       return;
@@ -126,10 +129,6 @@ export default function NewPost() {
       lng: 0,
       types: ['establishment'],
     };
-    if (!imageUri) {
-      Alert.alert('Error', 'Please add a photo');
-      return;
-    }
     if (!Validation.isRequired(description)) {
       Alert.alert('Error', 'Please write a review');
       return;
@@ -140,11 +139,14 @@ export default function NewPost() {
       return;
     }
 
+    submittingRef.current = true;
     setUploading(true);
 
     try {
-      // Upload image
-      const photoUrl = await ImageUploadService.uploadPostImage(imageUri, user.uid);
+      let photoUrl = '';
+      if (imageUri) {
+        photoUrl = await ImageUploadService.uploadPostImage(imageUri, user.uid);
+      }
 
       await PostService.createPost({
         userId: user.uid,
@@ -169,6 +171,7 @@ export default function NewPost() {
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
+      submittingRef.current = false;
       setUploading(false);
     }
   };
@@ -279,7 +282,7 @@ export default function NewPost() {
 
         {/* Image picker */}
         <View style={newPostStyles.imageSection}>
-          <Text style={newPostStyles.label}>📸 Add a photo:</Text>
+          <Text style={newPostStyles.label}>📸 Add a photo (optional):</Text>
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={newPostStyles.image} />
           ) : (
