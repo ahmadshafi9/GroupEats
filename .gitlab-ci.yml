@@ -1,0 +1,20 @@
+# GitLab AI Code Review Assistant – Phase 1
+# Runs on every merge request; posts a test comment.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+analyzer:
+  image: python:3.11-slim
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - cd code-review-assistant
+    - pip install -r requirements.txt
+  script:
+    - python -m src.pipeline
+  variables:
+    # CI_PROJECT_ID and CI_MERGE_REQUEST_IID are set by GitLab for MR pipelines.
+    # GITLAB_TOKEN must be set in Settings → CI/CD → Variables (masked).
+    GITLAB_BASE_URL: "https://gitlab.com"

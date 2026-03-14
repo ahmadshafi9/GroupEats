@@ -1,0 +1,20 @@
+# Minimal architecture plan for Phase 1.
+# Defines modules and paths; used later for architecture alignment (Phase 4).
+
+modules:
+  - name: app
+    path: app
+    responsibilities:
+      - screens and navigation
+      - auth flow
+  - name: services
+    path: services
+    responsibilities:
+      - business logic
+      - Firebase and API calls
+  - name: components
+    path: components
+    responsibilities:
+      - reusable UI
+
+rules: []

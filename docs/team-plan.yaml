@@ -1,0 +1,16 @@
+# Minimal team plan for Phase 1.
+# Used later for flowchart and "what I've done" (Phases 5–6).
+
+people:
+  - id: dev1
+    name: "Developer"
+    gitlab_username: ""  # Set to your GitLab username to attribute commits
+
+tasks:
+  - id: t1
+    title: "App and services"
+    owner: dev1
+    module: app
+    description: "Screens, navigation, and service layer."
+
+dependencies: []
