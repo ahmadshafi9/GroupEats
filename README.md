@@ -1,6 +1,6 @@
 <div align="center">
 
-# GroupEats
+# GroupEats 
 
 ### Discover, review, and share restaurant experiences with friends — then go eat together.
 
