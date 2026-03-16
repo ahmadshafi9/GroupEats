@@ -7,7 +7,13 @@ from unittest.mock import patch
 import pytest
 
 # Import the module under test (run tests from code-review-assistant with PYTHONPATH=. or repo root)
-from src.gitlab_client import create_mr_discussion, get_file_raw, get_mr_changes, get_mr_versions
+from src.gitlab_client import (
+    create_mr_discussion,
+    get_file_raw,
+    get_mr_changes,
+    get_mr_versions,
+    list_repo_tree,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -152,3 +158,22 @@ def test_get_file_raw_returns_empty_on_404(env):
         result = get_file_raw("123", "missing.ts", "abc")
 
     assert result == ""
+
+
+def test_list_repo_tree_calls_endpoint(env):
+    class DummyResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return [{"path": "app/index.tsx", "type": "blob"}]
+
+    with patch("src.gitlab_client.requests.get", return_value=DummyResponse()) as mock_get:
+        out = list_repo_tree("123", "abc", path="app", recursive=True)
+
+    assert out[0]["path"] == "app/index.tsx"
+    called_url = mock_get.call_args[0][0]
+    assert called_url.endswith("/repository/tree")

@@ -64,6 +64,20 @@ def get_file_raw(project_id: str, file_path: str, ref: str) -> str:
     return resp.text
 
 
+def list_repo_tree(project_id: str, ref: str, path: str = "", recursive: bool = True) -> list[dict[str, Any]]:
+    """
+    List repository tree entries (files and directories).
+    Returns JSON entries with fields like: path, type ('blob' or 'tree').
+    """
+    url = f"{_base_url()}/api/v4/projects/{project_id}/repository/tree"
+    params: dict[str, Any] = {"ref": ref, "recursive": recursive, "per_page": 100}
+    if path:
+        params["path"] = path
+    resp = requests.get(url, headers=_headers(), params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def create_mr_discussion(
     project_id: str,
     merge_request_iid: int,
