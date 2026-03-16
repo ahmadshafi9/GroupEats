@@ -1,9 +1,10 @@
 """
 GitLab API client for the code review assistant.
-Fetches MR changes, MR versions, and posts discussions (comments).
+Fetches MR changes, MR versions, file contents, and posts discussions (comments).
 """
 import os
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -15,7 +16,10 @@ def _base_url() -> str:
 def _headers() -> dict[str, str]:
     token = os.environ.get("GITLAB_TOKEN")
     if not token:
-        raise ValueError("GITLAB_TOKEN environment variable is required")
+        raise ValueError(
+            "GITLAB_TOKEN is not set. Add it in the project: "
+            "Settings → CI/CD → Variables (masked, scope: api or All)."
+        )
     return {"PRIVATE-TOKEN": token}
 
 
@@ -40,6 +44,24 @@ def get_mr_versions(project_id: str, merge_request_iid: int) -> list[dict[str, A
     resp = requests.get(url, headers=_headers(), timeout=30)
     resp.raise_for_status()
     return resp.json()
+
+
+def get_file_raw(project_id: str, file_path: str, ref: str) -> str:
+    """
+    Fetch raw file contents for a given path at a specific ref (commit or branch).
+
+    Returns the file content as text. If the file does not exist at the ref
+    (for example, deleted in this MR), returns an empty string.
+    """
+    # file_path must be URL-encoded for the API
+    encoded_path = quote(file_path, safe="")
+    url = f"{_base_url()}/api/v4/projects/{project_id}/repository/files/{encoded_path}/raw"
+    params = {"ref": ref}
+    resp = requests.get(url, headers=_headers(), params=params, timeout=30)
+    if resp.status_code == 404:
+        return ""
+    resp.raise_for_status()
+    return resp.text
 
 
 def create_mr_discussion(

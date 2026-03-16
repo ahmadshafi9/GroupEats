@@ -7,11 +7,7 @@ from unittest.mock import patch
 import pytest
 
 # Import the module under test (run tests from code-review-assistant with PYTHONPATH=. or repo root)
-from src.gitlab_client import (
-    create_mr_discussion,
-    get_mr_changes,
-    get_mr_versions,
-)
+from src.gitlab_client import create_mr_discussion, get_file_raw, get_mr_changes, get_mr_versions
 
 
 @pytest.fixture(autouse=True)
@@ -117,3 +113,42 @@ def test_missing_token_raises(env):
     with patch.dict(os.environ, {"GITLAB_TOKEN": ""}, clear=False):
         with pytest.raises(ValueError, match="GITLAB_TOKEN"):
             get_mr_changes("123", 5)
+
+
+def test_get_file_raw_returns_text(env):
+    class DummyResponse:
+        def __init__(self, status_code: int, text: str) -> None:
+            self.status_code = status_code
+            self.text = text
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise RuntimeError("error")
+
+    dummy = DummyResponse(200, "console.log('hi');")
+    with patch("src.gitlab_client.requests.get", return_value=dummy) as mock_get:
+        result = get_file_raw("123", "app/index.tsx", "abc")
+
+    assert result == "console.log('hi');"
+    called_url = mock_get.call_args[0][0]
+    assert "/projects/123/repository/files/" in called_url
+    assert called_url.endswith("/raw")
+
+
+def test_get_file_raw_returns_empty_on_404(env):
+    class DummyResponse:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+
+        def raise_for_status(self) -> None:
+            raise RuntimeError("should not be called")
+
+        @property
+        def text(self) -> str:  # pragma: no cover - not used in this case
+            return "not used"
+
+    dummy = DummyResponse(404)
+    with patch("src.gitlab_client.requests.get", return_value=dummy):
+        result = get_file_raw("123", "missing.ts", "abc")
+
+    assert result == ""

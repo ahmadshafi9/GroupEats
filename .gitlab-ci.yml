@@ -1,9 +1,20 @@
 # GitLab AI Code Review Assistant – Phase 1
-# Runs on every merge request; posts a test comment.
+# Plan: docs/CODE_REVIEW_ASSISTANT_PLAN.md, docs/architecture-plan.yaml, docs/team-plan.yaml
+# Runs on every merge request: test job (no token), analyzer job (posts comment; needs GITLAB_TOKEN).
 
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+test:
+  image: python:3.11-slim
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - cd code-review-assistant
+    - pip install -r requirements.txt
+  script:
+    - python -m pytest tests/ -v
 
 analyzer:
   image: python:3.11-slim
@@ -16,5 +27,5 @@ analyzer:
     - python -m src.pipeline
   variables:
     # CI_PROJECT_ID and CI_MERGE_REQUEST_IID are set by GitLab for MR pipelines.
-    # GITLAB_TOKEN must be set in Settings → CI/CD → Variables (masked).
+    # GITLAB_TOKEN must be set in Settings → CI/CD → Variables (masked, api scope).
     GITLAB_BASE_URL: "https://gitlab.com"
