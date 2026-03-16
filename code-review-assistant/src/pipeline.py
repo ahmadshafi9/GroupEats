@@ -108,7 +108,7 @@ def main() -> None:
             lines.append(
                 f"- `{mr_name}` in `{f.mr_unit.file}:{f.mr_unit.start_line}` is **{f.llm_decision}** of "
                 f"`{ex_name}` in `{f.existing_unit.file}:{f.existing_unit.start_line}` "
-                f\"(similarity {f.similarity:.2f}). {f.explanation}\"
+                f"(similarity {f.similarity:.2f}). {f.explanation}"
             )
 
         body = "\n".join(lines)
